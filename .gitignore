@@ -1,0 +1,53 @@
+# Frontend
+web/node_modules/
+web/dist/
+web/.env
+
+# Backend
+server/node_modules/
+server/.env
+
+# (optionnel mais pratique)
+node_modules/
+dist/
+.env
+
+
+# --- Python caches (dans ml-service) ---
+ml-service/__pycache__/
+ml-service/**/*.py[cod]
+ml-service/.pytest_cache/
+ml-service/.mypy_cache/
+ml-service/.ruff_cache/
+
+# --- Environnements virtuels ---
+ml-service/venv/
+ml-service/.venv/
+ml-service/env/
+
+# --- Secrets / config locale ---
+ml-service/.env
+ml-service/.env.*
+
+# --- Logs / runtime ---
+ml-service/*.log
+ml-service/**/*.log
+ml-service/*.sqlite3
+ml-service/**/*.sqlite3
+
+# --- IDE / OS ---
+ml-service/.vscode/
+ml-service/.idea/
+.DS_Store
+Thumbs.db
+
+# --- Données / modèles (souvent volumineux) ---
+ml-service/data/
+ml-service/model/
+
+# Optionnel : garder des dossiers vides dans git
+!ml-service/data/.gitkeep
+!ml-service/model/.gitkeep
+
+
+
