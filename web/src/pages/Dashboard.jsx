@@ -425,7 +425,7 @@ export default function Dashboard() {
 				</div>
 
 				{/* Impact FEFO */}
-				<div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 border border-green-200">
+				<div className=" from-green-50 to-blue-50 rounded-lg p-6 border border-green-200">
 					<div className="flex items-start gap-4">
 						<span className="text-4xl">🌱</span>
 						<div className="flex-1">
