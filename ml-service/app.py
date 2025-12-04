@@ -1,388 +1,467 @@
 """
-Mont-Vert ML Service
-Flask API pour les prédictions de repas avec XGBoost
+Mont-Vert ML Service - Flask API pour XGBoost
+Version avec 11 features (6 temporelles + 5 stock)
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
+import xgboost as xgb
 import numpy as np
-import joblib
+import pickle
 import os
-from datetime import datetime, timedelta
-import json
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
 
-# Chemins
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'model', 'xgboost_model.pkl')
-LABEL_ENCODER_PATH = os.path.join(os.path.dirname(__file__), 'model', 'label_encoder.pkl')
-FEATURE_COLUMNS_PATH = os.path.join(os.path.dirname(__file__), 'model', 'feature_columns.json')
+# Chemins - Sauvegarde dans le dossier model/
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, 'model')
+MODEL_PATH = os.path.join(MODEL_DIR, 'recipe_model.pkl')
 
-# Variables globales pour le modèle
+# Créer le dossier model/ s'il n'existe pas
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+# Variables globales
 model = None
+feature_names = None
 label_encoder = None
-feature_columns = None
 
+# ═══════════════════════════════════════════════════════════════════════════
+# CHARGEMENT / SAUVEGARDE DU MODÈLE
+# ═══════════════════════════════════════════════════════════════════════════
 
 def load_model():
-    """Charge le modèle XGBoost et le label encoder"""
-    global model, label_encoder, feature_columns
-    
+    """Charge le modèle depuis le disque"""
+    global model, feature_names, label_encoder
     if os.path.exists(MODEL_PATH):
-        model = joblib.load(MODEL_PATH)
-        print(f"Modèle chargé depuis {MODEL_PATH}")
-    else:
-        print(f"Modèle non trouvé: {MODEL_PATH}")
-        model = None
-    
-    if os.path.exists(LABEL_ENCODER_PATH):
-        label_encoder = joblib.load(LABEL_ENCODER_PATH)
-        print(f"Label encoder chargé")
-    else:
-        label_encoder = None
-    
-    if os.path.exists(FEATURE_COLUMNS_PATH):
-        with open(FEATURE_COLUMNS_PATH, 'r') as f:
-            feature_columns = json.load(f)
-        print(f"{len(feature_columns)} features chargées")
-    else:
-        feature_columns = None
+        with open(MODEL_PATH, 'rb') as f:
+            saved_data = pickle.load(f)
+            model = saved_data['model']
+            feature_names = saved_data['feature_names']
+            label_encoder = saved_data.get('label_encoder')  # Peut être None pour anciens modèles
+        print(f"✅ Modèle chargé : {len(feature_names)} features, {len(label_encoder.classes_) if label_encoder else 0} classes")
+        return True
+    return False
 
+def save_model(trained_model, features, encoder):
+    """Sauvegarde le modèle sur le disque"""
+    global model, feature_names, label_encoder
+    model = trained_model
+    feature_names = features
+    label_encoder = encoder
+    
+    with open(MODEL_PATH, 'wb') as f:
+        pickle.dump({
+            'model': model,
+            'feature_names': feature_names,
+            'label_encoder': label_encoder
+        }, f)
+    print(f"✅ Modèle sauvegardé : {len(feature_names)} features, {len(label_encoder.classes_)} classes")
+    print(f"   📁 Chemin : {MODEL_PATH}")
 
-@app.route('/health', methods=['GET'])
-def health():
-    """Endpoint de santé"""
-    return jsonify({
-        'status': 'ok',
-        'model_loaded': model is not None,
-        'timestamp': datetime.now().isoformat()
-    })
-
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    """
-    Prédit les meilleures recettes basées sur le stock actuel
-    
-    Input JSON:
-    {
-        "date": "2025-11-26",
-        "planned_portions": 50,
-        "stock": [
-            {"product_id": 1, "available_qty": 10.5, "days_to_expiry": 3},
-            ...
-        ],
-        "recipes": [
-            {"id": 1, "name": "Pâtes carbonara"},
-            ...
-        ],
-        "last_recipes": [5, 3]  // IDs des 2 dernières recettes servies
-    }
-    
-    Output JSON:
-    {
-        "predictions": [
-            {
-                "recipe_id": 1,
-                "recipe_name": "Pâtes carbonara",
-                "probability": 0.85,
-                "confidence": "high",
-                "reasons": ["Utilise jambon (expire dans 2j)", "Populaire le lundi"]
-            },
-            ...
-        ],
-        "model_info": {
-            "version": "1.0",
-            "trained_on": "2025-11-26"
-        }
-    }
-    """
-    global model, label_encoder, feature_columns
-    
-    if model is None:
-        return jsonify({
-            'error': 'Modèle non entraîné. Veuillez d\'abord entraîner le modèle.',
-            'predictions': []
-        }), 400
-    
-    try:
-        data = request.get_json()
-        
-        # Extraire les données
-        date_str = data.get('date', datetime.now().strftime('%Y-%m-%d'))
-        planned_portions = data.get('planned_portions', 50)
-        stock = data.get('stock', [])
-        recipes = data.get('recipes', [])
-        last_recipes = data.get('last_recipes', [0, 0])
-        
-        # Parser la date
-        date = datetime.strptime(date_str, '%Y-%m-%d')
-        
-        # Construire le vecteur de features
-        features = {
-            'day_of_week': date.weekday(),
-            'month': date.month,
-            'week_of_year': date.isocalendar()[1],
-            'planned_portions': planned_portions,
-            'last_recipe_1': last_recipes[0] if len(last_recipes) > 0 else 0,
-            'last_recipe_2': last_recipes[1] if len(last_recipes) > 1 else 0,
-        }
-        
-        # Ajouter les features de stock
-        for item in stock:
-            pid = item['product_id']
-            features[f'stock_{pid}'] = item.get('available_qty', 0)
-            features[f'days_to_expiry_{pid}'] = item.get('days_to_expiry', 30)
-        
-        # Créer le DataFrame avec les bonnes colonnes
-        df = pd.DataFrame([features])
-        
-        # S'assurer que toutes les colonnes du modèle sont présentes
-        for col in feature_columns:
-            if col not in df.columns:
-                df[col] = 0
-        
-        # Garder seulement les colonnes attendues dans le bon ordre
-        df = df[feature_columns]
-        
-        # Prédiction
-        probabilities = model.predict_proba(df)[0]
-        
-        # Mapper les classes aux recettes
-        predictions = []
-        recipe_map = {r['id']: r['name'] for r in recipes}
-        
-        for idx, prob in enumerate(probabilities):
-            if prob > 0.01:  # Filtrer les très faibles probabilités
-                recipe_id = label_encoder.inverse_transform([idx])[0]
-                recipe_name = recipe_map.get(recipe_id, f"Recette #{recipe_id}")
-                
-                # Déterminer le niveau de confiance
-                if prob >= 0.7:
-                    confidence = 'high'
-                elif prob >= 0.4:
-                    confidence = 'medium'
-                else:
-                    confidence = 'low'
-                
-                # Générer les raisons
-                reasons = generate_reasons(recipe_id, stock, date, recipes)
-                
-                predictions.append({
-                    'recipe_id': int(recipe_id),
-                    'recipe_name': recipe_name,
-                    'probability': round(float(prob), 4),
-                    'confidence': confidence,
-                    'reasons': reasons
-                })
-        
-        # Trier par probabilité décroissante
-        predictions.sort(key=lambda x: x['probability'], reverse=True)
-        
-        # Garder le top 5
-        predictions = predictions[:5]
-        
-        return jsonify({
-            'predictions': predictions,
-            'model_info': {
-                'version': '1.0',
-                'features_count': len(feature_columns),
-                'date_predicted': date_str
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'predictions': []
-        }), 500
-
-
-def generate_reasons(recipe_id, stock, date, recipes):
-    """Génère des explications pour la recommandation"""
-    reasons = []
-    
-    # Jour de la semaine
-    days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-    day_name = days[date.weekday()]
-    reasons.append(f"Adapté pour un {day_name}")
-    
-    # Produits urgents
-    urgent_products = [s for s in stock if s.get('days_to_expiry', 30) <= 3]
-    if urgent_products:
-        product_names = [f"produit #{p['product_id']}" for p in urgent_products[:2]]
-        reasons.append(f"Utilise des produits urgents")
-    
-    return reasons
-
+# ═══════════════════════════════════════════════════════════════════════════
+# ENTRAÎNEMENT
+# ═══════════════════════════════════════════════════════════════════════════
 
 @app.route('/train', methods=['POST'])
 def train():
     """
-    Entraîne le modèle XGBoost avec les données fournies
+    Entraîne le modèle XGBoost
     
-    Input JSON:
+    Body JSON :
     {
         "training_data": [
             {
-                "date": "2025-11-20",
-                "recipe_id": 1,
-                "planned_portions": 50,
-                "stock": [...],
-                "last_recipes": [5, 3]
+                "date": "2020-01-06",
+                "recipe_id": 15,
+                "day_of_week": 0,
+                "month": 1,
+                "week_of_year": 1,
+                "planned_portions": 12,
+                "last_recipe_1": 22,
+                "last_recipe_2": 8,
+                "recipe_feasible": 1,
+                "availability_score": 1.0,
+                "min_days_to_expiry": 5,
+                "nb_missing_ingredients": 0,
+                "urgency_score": 0.83
             },
             ...
         ]
     }
     """
-    global model, label_encoder, feature_columns
-    
     try:
-        data = request.get_json()
+        data = request.json
         training_data = data.get('training_data', [])
         
-        if len(training_data) < 10:
+        if not training_data:
             return jsonify({
-                'error': f'Pas assez de données pour entraîner (minimum 10, reçu {len(training_data)})',
-                'success': False
+                'success': False,
+                'error': 'Aucune donnée d\'entraînement fournie'
             }), 400
         
-        # Préparer les données
-        rows = []
-        for record in training_data:
-            date = datetime.strptime(record['date'], '%Y-%m-%d')
-            
-            row = {
-                'day_of_week': date.weekday(),
-                'month': date.month,
-                'week_of_year': date.isocalendar()[1],
-                'planned_portions': record.get('planned_portions', 50),
-                'last_recipe_1': record.get('last_recipes', [0, 0])[0] if record.get('last_recipes') else 0,
-                'last_recipe_2': record.get('last_recipes', [0, 0])[1] if len(record.get('last_recipes', [])) > 1 else 0,
-                'recipe_id': record['recipe_id']
-            }
-            
-            # Ajouter les features de stock
-            for item in record.get('stock', []):
-                pid = item['product_id']
-                row[f'stock_{pid}'] = item.get('available_qty', 0)
-                row[f'days_to_expiry_{pid}'] = item.get('days_to_expiry', 30)
-            
-            rows.append(row)
+        print(f"\n🚀 Entraînement avec {len(training_data)} exemples...")
         
-        df = pd.DataFrame(rows)
+        # Conversion en DataFrame
+        df = pd.DataFrame(training_data)
         
-        # Remplir les NaN avec 0
-        df = df.fillna(0)
+        # Colonnes des features (11 au total)
+        feature_columns = [
+            'day_of_week',
+            'month', 
+            'week_of_year',
+            'planned_portions',
+            'last_recipe_1',
+            'last_recipe_2',
+            'recipe_feasible',
+            'availability_score',
+            'min_days_to_expiry',
+            'nb_missing_ingredients',
+            'urgency_score'
+        ]
         
-        # Séparer features et target
-        target = df['recipe_id']
-        features_df = df.drop('recipe_id', axis=1)
+        # Vérifier que toutes les colonnes existent
+        missing_cols = [col for col in feature_columns if col not in df.columns]
+        if missing_cols:
+            return jsonify({
+                'success': False,
+                'error': f'Colonnes manquantes : {missing_cols}'
+            }), 400
         
-        # Encoder les labels
+        # Préparer X (features) et y (target)
+        X = df[feature_columns].fillna(0)
+        y_raw = df['recipe_id']
+        
+        print(f"   📊 Matrice X : {X.shape}")
+        print(f"   📊 Features : {list(X.columns)}")
+        print(f"   🎯 Classes uniques : {y_raw.nunique()}")
+        print(f"   🎯 Recipe IDs : {sorted(y_raw.unique())}")
+        
+        # Encoder les labels (recipe_id → 0-indexed)
         from sklearn.preprocessing import LabelEncoder
         label_encoder = LabelEncoder()
-        y = label_encoder.fit_transform(target)
+        y = label_encoder.fit_transform(y_raw)
         
-        # Sauvegarder les colonnes de features
-        feature_columns = list(features_df.columns)
+        print(f"   🔄 Encodage : {list(y_raw.unique())[:5]} → {list(set(y))[:5]}")
         
         # Entraîner XGBoost
-        from xgboost import XGBClassifier
+        print("   🧠 Entraînement XGBoost...")
         
-        model = XGBClassifier(
+        xgb_model = xgb.XGBClassifier(
             n_estimators=100,
             max_depth=6,
             learning_rate=0.1,
-            objective='multi:softprob',
             random_state=42,
-            use_label_encoder=False,
+            objective='multi:softprob',
             eval_metric='mlogloss'
         )
         
-        model.fit(features_df, y)
+        xgb_model.fit(X, y)
         
-        # Sauvegarder le modèle
-        joblib.dump(model, MODEL_PATH)
-        joblib.dump(label_encoder, LABEL_ENCODER_PATH)
+        # Sauvegarder
+        save_model(xgb_model, feature_columns, label_encoder)
         
-        with open(FEATURE_COLUMNS_PATH, 'w') as f:
-            json.dump(feature_columns, f)
+        # Calculer l'accuracy
+        train_accuracy = xgb_model.score(X, y) * 100
         
-        # Calculer les métriques
-        from sklearn.model_selection import cross_val_score
-        accuracy = model.score(features_df, y)
+        # Feature importance
+        importance = xgb_model.feature_importances_
+        feature_importance = {
+            feature_columns[i]: float(importance[i]) 
+            for i in range(len(feature_columns))
+        }
+        
+        # Trier par importance
+        sorted_importance = sorted(
+            feature_importance.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )
+        
+        print(f"\n✅ Entraînement terminé !")
+        print(f"   Accuracy : {train_accuracy:.1f}%")
+        print(f"\n📊 Feature Importance :")
+        for feat, imp in sorted_importance:
+            print(f"   {feat:25s} : {imp*100:5.1f}%")
         
         return jsonify({
             'success': True,
-            'message': 'Modèle entraîné avec succès',
             'metrics': {
-                'samples': len(training_data),
-                'features': len(feature_columns),
-                'classes': len(label_encoder.classes_),
-                'accuracy': round(accuracy, 4)
+                'accuracy': round(train_accuracy, 2),
+                'num_samples': len(training_data),
+                'num_features': len(feature_columns),
+                'num_classes': int(y_raw.nunique())
             },
-            'model_path': MODEL_PATH
+            'feature_importance': {k: round(v * 100, 2) for k, v in sorted_importance}
         })
         
     except Exception as e:
+        print(f"❌ Erreur d'entraînement : {str(e)}")
         import traceback
+        traceback.print_exc()
         return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc(),
-            'success': False
+            'success': False,
+            'error': str(e)
         }), 500
 
+# ═══════════════════════════════════════════════════════════════════════════
+# PRÉDICTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    """
+    Génère des prédictions
+    
+    Body JSON :
+    {
+        "context": {
+            "date": "2025-01-15",
+            "day_of_week": 1,
+            "month": 1,
+            "week_of_year": 3,
+            "planned_portions": 50,
+            "last_recipe_1": 22,
+            "last_recipe_2": 8,
+            "recipe_feasible": 1,
+            "availability_score": 1.0,
+            "min_days_to_expiry": 30,
+            "nb_missing_ingredients": 0,
+            "urgency_score": 0.5
+        },
+        "num_predictions": 5
+    }
+    """
+    global model, feature_names
+    
+    if model is None:
+        if not load_model():
+            return jsonify({
+                'success': False,
+                'error': 'Modèle non entraîné'
+            }), 400
+    
+    try:
+        data = request.json
+        context = data.get('context', {})
+        num_predictions = data.get('num_predictions', 5)
+        
+        # Créer le DataFrame avec les features
+        X = pd.DataFrame([{
+            'day_of_week': context.get('day_of_week', 0),
+            'month': context.get('month', 1),
+            'week_of_year': context.get('week_of_year', 1),
+            'planned_portions': context.get('planned_portions', 50),
+            'last_recipe_1': context.get('last_recipe_1', 0),
+            'last_recipe_2': context.get('last_recipe_2', 0),
+            'recipe_feasible': context.get('recipe_feasible', 1),
+            'availability_score': context.get('availability_score', 1.0),
+            'min_days_to_expiry': context.get('min_days_to_expiry', 30),
+            'nb_missing_ingredients': context.get('nb_missing_ingredients', 0),
+            'urgency_score': context.get('urgency_score', 0.5)
+        }])
+        
+        # S'assurer que les colonnes sont dans le bon ordre
+        X = X[feature_names]
+        
+        # Prédiction des probabilités
+        probas = model.predict_proba(X)[0]
+        
+        # Décoder les classes (indices → recipe_id)
+        if label_encoder:
+            classes = label_encoder.inverse_transform(model.classes_)
+        else:
+            classes = model.classes_
+        
+        # Trier par probabilité décroissante
+        top_indices = np.argsort(probas)[::-1][:num_predictions]
+        
+        predictions = []
+        for idx in top_indices:
+            prob = float(probas[idx])
+            
+            # Déterminer le niveau de confiance
+            if prob >= 0.7:
+                confidence = 'high'
+            elif prob >= 0.4:
+                confidence = 'medium'
+            else:
+                confidence = 'low'
+            
+            # Générer des raisons simples (seront remplacées côté Node.js)
+            reasons = []
+            
+            # Jour de la semaine
+            days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+            day_of_week = context.get('day_of_week', 0)
+            if 0 <= day_of_week <= 6:
+                reasons.append(f"Adapté pour un {days[day_of_week]}")
+            
+            # Note : Les raisons détaillées seront générées côté Node.js
+            # après enrichissement avec les vraies features de stock
+            
+            predictions.append({
+                'recipe_id': int(classes[idx]),
+                'probability': prob,
+                'confidence': confidence,
+                'reasons': reasons
+            })
+        
+        return jsonify({
+            'success': True,
+            'predictions': predictions
+        })
+        
+    except Exception as e:
+        print(f"❌ Erreur de prédiction : {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ENDPOINTS UTILITAIRES
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Vérifie la santé du service"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'ml-service',
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/status', methods=['GET'])
+def status():
+    """Retourne le statut du modèle"""
+    global model, feature_names, label_encoder
+    
+    if model is None:
+        load_model()
+    
+    num_classes = 0
+    if model is not None:
+        if label_encoder:
+            num_classes = len(label_encoder.classes_)
+        else:
+            num_classes = len(model.classes_)
+    
+    return jsonify({
+        'model_loaded': model is not None,
+        'num_features': len(feature_names) if feature_names else 0,
+        'features': feature_names if feature_names else [],
+        'num_classes': num_classes
+    })
 
 @app.route('/model-info', methods=['GET'])
 def model_info():
-    """Retourne les informations sur le modèle actuel"""
-    global model, label_encoder, feature_columns
+    """Informations détaillées sur le modèle"""
+    global model, feature_names, label_encoder
     
     if model is None:
+        if not load_model():
+            return jsonify({
+                'trained': False,  # ✅ Retourner 'trained' pour React
+                'available': False,
+                'error': 'Modèle non entraîné'
+            })
+    
+    try:
+        importance = model.feature_importances_
+        feature_importance = {
+            feature_names[i]: float(importance[i])  # ✅ Valeur brute (0-1)
+            for i in range(len(feature_names))
+        }
+        
+        # Obtenir les recipe_id réels
+        if label_encoder:
+            classes = label_encoder.inverse_transform(model.classes_)
+        else:
+            classes = model.classes_
+        
+        return jsonify({
+            'trained': True,  # ✅ Ajouter 'trained' pour React
+            'available': True,
+            'num_features': len(feature_names),
+            'features': feature_names,
+            'num_classes': len(classes),
+            'classes': [int(c) for c in classes],
+            'feature_importance': feature_importance,
+            'model_type': 'XGBClassifier',
+            # Alias pour compatibilité React
+            'features_count': len(feature_names),
+            'classes_count': len(classes)
+        })
+        
+    except Exception as e:
         return jsonify({
             'trained': False,
-            'message': 'Aucun modèle entraîné'
+            'available': False,
+            'error': str(e)
         })
-    
-    return jsonify({
-        'trained': True,
-        'features_count': len(feature_columns) if feature_columns else 0,
-        'classes_count': len(label_encoder.classes_) if label_encoder else 0,
-        'feature_names': feature_columns[:20] if feature_columns else [],  # Top 20
-        'model_type': 'XGBClassifier'
-    })
-
 
 @app.route('/feature-importance', methods=['GET'])
-def feature_importance():
+def feature_importance_endpoint():
     """Retourne l'importance des features"""
-    global model, feature_columns
+    global model, feature_names
     
     if model is None:
-        return jsonify({'error': 'Modèle non entraîné'}), 400
+        if not load_model():
+            return jsonify({
+                'available': False,
+                'error': 'Modèle non entraîné'
+            })
     
-    importance = model.feature_importances_
-    
-    # Créer un dictionnaire feature -> importance
-    importance_dict = []
-    for idx, col in enumerate(feature_columns):
-        importance_dict.append({
-            'feature': col,
-            'importance': round(float(importance[idx]), 4)
+    try:
+        importance = model.feature_importances_
+        feature_importance = [
+            {
+                'feature': feature_names[i],
+                'importance': float(importance[i])  # ✅ Valeur brute (0-1), React fera *100
+            }
+            for i in range(len(feature_names))
+        ]
+        
+        # Trier par importance
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        
+        return jsonify({
+            'available': True,
+            'feature_importance': feature_importance  # ✅ Nom correct pour React
         })
-    
-    # Trier par importance décroissante
-    importance_dict.sort(key=lambda x: x['importance'], reverse=True)
-    
-    return jsonify({
-        'feature_importance': importance_dict[:15]  # Top 15
-    })
+        
+    except Exception as e:
+        return jsonify({
+            'available': False,
+            'error': str(e)
+        })
 
+# ═══════════════════════════════════════════════════════════════════════════
+# DÉMARRAGE
+# ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    load_model()
-    print("🚀 Mont-Vert ML Service démarré sur http://localhost:5001")
+    print("🚀 Démarrage du service ML Mont-Vert")
+    print("   Features attendues : 11 (6 temporelles + 5 stock)")
+    print(f"   📁 Modèle sauvegardé dans : {MODEL_PATH}")
+    
+    # Charger le modèle existant s'il existe
+    if load_model():
+        print(f"   ✅ Modèle existant chargé")
+    else:
+        print(f"   ⚠️ Aucun modèle existant - en attente d'entraînement")
+    
+    print("\n🌐 Service disponible sur http://localhost:5001")
+    print("   - POST /train              : Entraîner le modèle")
+    print("   - POST /predict            : Obtenir des prédictions")
+    print("   - GET  /health             : Vérifier la santé")
+    print("   - GET  /status             : Statut du modèle")
+    print("   - GET  /model-info         : Infos détaillées")
+    print("   - GET  /feature-importance : Importance des features\n")
+    
     app.run(host='0.0.0.0', port=5001, debug=True)
