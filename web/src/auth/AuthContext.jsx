@@ -19,9 +19,9 @@ export default function AuthProvider({ children }) {
     }
 
     async function logout() {
-        try { await api.post('/auth/logout'); } catch { }
-        localStorage.removeItem('user');
-        setUser(null);
+        try { await api.post('/auth/logout') } catch { }
+        localStorage.removeItem('user')
+        setUser(null)
     }
 
     async function register({ name, email, password, role }) {

@@ -1,12 +1,12 @@
 // server/src/cron/scheduler.js
-import cron from 'node-cron';
-import alertService from '../services/alert.service.js';
+import cron from 'node-cron'
+import alertService from '../services/alert.service.js'
 
 /**
  * Planificateur de tâches automatiques
  */
 
-let alertJob = null;
+let alertJob = null
 
 /**
  * Démarre le job d'alertes quotidiennes
@@ -15,32 +15,32 @@ let alertJob = null;
 export function startAlertScheduler(cronExpression = '0 7 * * *') {
     // Arrêter l'ancien job s'il existe
     if (alertJob) {
-        alertJob.stop();
+        alertJob.stop()
     }
     
-    console.log(`📧 Alert scheduler started: ${cronExpression}`);
+    console.log(`📧 Alert scheduler started: ${cronExpression}`)
     
     alertJob = cron.schedule(cronExpression, async () => {
-        console.log(`[${new Date().toISOString()}] Running daily DLC alert check...`);
+        console.log(`[${new Date().toISOString()}] Running daily DLC alert check...`)
         
         try {
             const result = await alertService.sendAlertEmails({
                 daysThreshold: 3
-            });
+            })
             
             if (result.sent) {
-                console.log(`✅ Alerts sent: ${result.products_count} products, ${result.recipients_count} recipients`);
+                console.log(` Alerts sent: ${result.products_count} products, ${result.recipients_count} recipients`)
             } else {
-                console.log(`ℹ️ No alerts needed: ${result.message}`);
+                console.log(` No alerts needed: ${result.message}`)
             }
         } catch (error) {
-            console.error('❌ Error sending alerts:', error);
+            console.error(' Error sending alerts:', error)
         }
     }, {
         timezone: 'Europe/Paris' // Ajuster selon la timezone
-    });
+    })
     
-    return alertJob;
+    return alertJob
 }
 
 /**
@@ -48,9 +48,9 @@ export function startAlertScheduler(cronExpression = '0 7 * * *') {
  */
 export function stopAlertScheduler() {
     if (alertJob) {
-        alertJob.stop();
-        alertJob = null;
-        console.log('📧 Alert scheduler stopped');
+        alertJob.stop()
+        alertJob = null
+        console.log('📧 Alert scheduler stopped')
     }
 }
 
@@ -58,11 +58,11 @@ export function stopAlertScheduler() {
  * Vérifie si le scheduler est actif
  */
 export function isSchedulerRunning() {
-    return alertJob !== null;
+    return alertJob !== null
 }
 
 export default {
     startAlertScheduler,
     stopAlertScheduler,
     isSchedulerRunning
-};
+}

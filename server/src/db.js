@@ -1,16 +1,6 @@
+// .env situé dans server/.env (un niveau au-dessus de src)
 import dotenv from 'dotenv'
 dotenv.config()
-
-// import mysql from 'mysql2/promise';
-// import dotenv from 'dotenv';
-// import path from 'node:path';
-// import { fileURLToPath } from 'node:url';
-
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname  = path.dirname(__filename);
-
-// // .env situé dans server/.env (un niveau au-dessus de src)
-// dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import mysql from 'mysql2/promise'
 
 export const pool = mysql.createPool({

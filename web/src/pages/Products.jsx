@@ -1,55 +1,57 @@
-import useDebounce from '../hooks/useDebounce';
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import Layout from '../components/Layout';
-import Modal from '../components/Modal';
-import ConfirmDialog from '../components/ConfirmDialog';
-import Pagination from '../components/Pagination';
-import api from '../api/axios';
-import toast from 'react-hot-toast';
+import useDebounce from '../hooks/useDebounce'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import Layout from '../components/Layout'
+import Modal from '../components/Modal'
+import ConfirmDialog from '../components/ConfirmDialog'
+import Pagination from '../components/Pagination'
+import api from '../api/axios'
+import toast from 'react-hot-toast'
 
 export default function Products() {
-    const [items, setItems] = useState([]);
-    const [page, setPage] = useState(1);
-    const [pageSize] = useState(10);
-    const [total, setTotal] = useState(0);
-    const [q, setQ] = useState('');
-    const [openForm, setOpenForm] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [openConfirm, setOpenConfirm] = useState(false);
-    const [toDelete, setToDelete] = useState(null);
-    const qDebounced = useDebounce(q, 300);
+    const [items, setItems] = useState([])
+    const [page, setPage] = useState(1)
+    const [pageSize] = useState(10)
+    const [total, setTotal] = useState(0)
+    const [q, setQ] = useState('')
+    const [openForm, setOpenForm] = useState(false)
+    const [editing, setEditing] = useState(null)
+    const [openConfirm, setOpenConfirm] = useState(false)
+    const [toDelete, setToDelete] = useState(null)
+    const qDebounced = useDebounce(q, 300)
 
     const { register, handleSubmit, reset } = useForm({
         defaultValues: { name: '', unit: 'kg', cost: 0, alert_threshold: 0, active: true }
-    });
+    })
 
     async function load(p = page, query = q) {
-        const { data } = await api.get('/products', { params: { page: p, pageSize, q: query } });
-        setItems(data.data); setTotal(data.total); setPage(data.page);
+        const { data } = await api.get('/products', { params: { page: p, pageSize, q: query } })
+        setItems(data.data)
+        setTotal(data.total)
+        setPage(data.page)
     }
 
-    useEffect(() => { load(1, qDebounced); }, [qDebounced]); // recharge à chaque frappe (debounce)
+    useEffect(() => { load(1, qDebounced) }, [qDebounced]) // recharge à chaque frappe (debounce)
 
 
     function openAdd() {
-        setEditing(null);
-        reset({ name: '', unit: 'kg', cost: 0, alert_threshold: 0, active: true });
-        setOpenForm(true);
+        setEditing(null)
+        reset({ name: '', unit: 'kg', cost: 0, alert_threshold: 0, active: true })
+        setOpenForm(true)
     }
     function openEdit(row) {
-        setEditing(row);
+        setEditing(row)
         reset({
             name: row.name, unit: row.unit, cost: row.cost,
             alert_threshold: row.alert_threshold, active: !!row.active
-        });
-        setOpenForm(true);
+        })
+        setOpenForm(true)
     }
 
     async function onSubmit(values) {
-        values.cost = Number(values.cost || 0);
-        values.alert_threshold = Number(values.alert_threshold || 0);
-        values.active = !!values.active;
+        values.cost = Number(values.cost || 0)
+        values.alert_threshold = Number(values.alert_threshold || 0)
+        values.active = !!values.active
         if (editing) {
             await api.patch(`/products/${editing.id}`, values)
             toast.success('Product edited')
@@ -58,26 +60,30 @@ export default function Products() {
             await api.post('/products', values)
             toast.success('Lot added')
         }
-        setOpenForm(false);
-        await load();
+        setOpenForm(false)
+        await load()
     }
 
-    function askDelete(row) { setToDelete(row); setOpenConfirm(true); }
+    function askDelete(row) {
+        setToDelete(row)
+        setOpenConfirm(true)
+    }
     async function doDelete() {
         try {
             await api.delete(`/products/${toDelete.id}`)
             toast.success('Product deleted')
-            setOpenConfirm(false); setToDelete(null);
+            setOpenConfirm(false)
+            setToDelete(null)
             // si on supprime le dernier de la page, revenir à page-1 si nécessaire
-            const newPage = (items.length === 1 && page > 1) ? page - 1 : page;
-            await load(newPage, q);
+            const newPage = (items.length === 1 && page > 1) ? page - 1 : page
+            await load(newPage, q)
         } catch (e) {
-            // alert(e?.response?.data?.error || 'Cannot delete');
+            // alert(e?.response?.data?.error || 'Cannot delete')
             // console.log(e)
         }
     }
 
-    async function search() { await load(1, q); }
+    async function search() { await load(1, q) }
 
     return (
         <Layout>
@@ -171,9 +177,12 @@ export default function Products() {
                 open={openConfirm}
                 title="Delete product"
                 message={`Are you sure you want to delete "${toDelete?.name}" ?`}
-                onCancel={() => { setOpenConfirm(false); setToDelete(null); }}
+                onCancel={() => {
+                    setOpenConfirm(false)
+                    setToDelete(null)
+                }}
                 onConfirm={doDelete}
             />
         </Layout>
-    );
+    )
 }

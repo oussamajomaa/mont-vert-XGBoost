@@ -1,18 +1,18 @@
-import { Chart as ChartJS } from 'chart.js';
+import { Chart as ChartJS } from 'chart.js'
 
 // Typo & couleurs globales
-ChartJS.defaults.color = '#334155';          // slate-700
-ChartJS.defaults.font.family = 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell';
-ChartJS.defaults.borderColor = 'rgba(148,163,184,0.25)'; // slate-400/25
+ChartJS.defaults.color = '#334155'          // slate-700
+ChartJS.defaults.font.family = 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell'
+ChartJS.defaults.borderColor = 'rgba(148,163,184,0.25)' // slate-400/25
 
 // Palette utilitaire
 export const palette = {
-  in:   { border: 'rgb(16,185,129)',  bg: 'rgba(16,185,129,0.20)'  }, // emerald-500
-  out:  { border: 'rgb(239,68,68)',   bg: 'rgba(239,68,68,0.20)'   }, // red-500
-  adj:  { border: 'rgb(245,158,11)',  bg: 'rgba(245,158,11,0.20)'  }, // amber-500
-  loss: { border: 'rgb(238,130,238)', bg: 'rgba(238,130,238,0.20)'   }, // violet-500
-  exp:  { border: 'rgb(99,102,241)',  bg: 'rgba(99,102,241,0.20)'  }, // indigo (EXPIRED)
-};
+  in: { border: 'rgb(16,185,129)', bg: 'rgba(16,185,129,0.20)' }, // emerald-500
+  out: { border: 'rgb(239,68,68)', bg: 'rgba(239,68,68,0.20)' }, // red-500
+  adj: { border: 'rgb(245,158,11)', bg: 'rgba(245,158,11,0.20)' }, // amber-500
+  loss: { border: 'rgb(238,130,238)', bg: 'rgba(238,130,238,0.20)' }, // violet-500
+  exp: { border: 'rgb(99,102,241)', bg: 'rgba(99,102,241,0.20)' }, // indigo (EXPIRED)
+}
 
 // Catégories (bar/doughnut)
 export const categorical = [
@@ -24,7 +24,7 @@ export const categorical = [
   '#14b8a6', // teal-500
   '#a855f7', // purple-500
   '#06b6d4', // cyan-500
-];
+]
 
 // Options communes
 export const commonOptions = {
@@ -50,4 +50,4 @@ export const commonOptions = {
       ticks: { color: '#475569' }
     }
   }
-};
+}

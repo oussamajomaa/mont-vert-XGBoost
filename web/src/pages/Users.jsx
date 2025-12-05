@@ -1,72 +1,79 @@
 // src/pages/Users.jsx
-import { useEffect, useState } from 'react';
-import Layout from '../components/Layout';
-import api from '../api/axios';
-import Pagination from '../components/Pagination';
-import Modal from '../components/Modal';
-import ConfirmDialog from '../components/ConfirmDialog';
-import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react'
+import Layout from '../components/Layout'
+import api from '../api/axios'
+import Pagination from '../components/Pagination'
+import Modal from '../components/Modal'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useForm } from 'react-hook-form'
+import toast from 'react-hot-toast'
 
-const ROLES = ['ADMIN', 'KITCHEN', 'DIRECTOR'];
+const ROLES = ['ADMIN', 'KITCHEN', 'DIRECTOR']
 
 export default function Users() {
-    const [rows, setRows] = useState([]);
-    const [page, setPage] = useState(1);
-    const [pageSize] = useState(10);
-    const [total, setTotal] = useState(0);
-    const [q, setQ] = useState('');
+    const [rows, setRows] = useState([])
+    const [page, setPage] = useState(1)
+    const [pageSize] = useState(10)
+    const [total, setTotal] = useState(0)
+    const [q, setQ] = useState('')
 
-    const [openAdd, setOpenAdd] = useState(false);
-    const [openEdit, setOpenEdit] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [openDel, setOpenDel] = useState(false);
-    const [toDelete, setToDelete] = useState(null);
+    const [openAdd, setOpenAdd] = useState(false)
+    const [openEdit, setOpenEdit] = useState(false)
+    const [editing, setEditing] = useState(null)
+    const [openDel, setOpenDel] = useState(false)
+    const [toDelete, setToDelete] = useState(null)
 
     async function load(p = page) {
-        const { data } = await api.get('/users', { params: { page: p, pageSize, q: q || undefined } });
-        setRows(data.data); setTotal(data.total); setPage(data.page);
+        const { data } = await api.get('/users', { params: { page: p, pageSize, q: q || undefined } })
+        setRows(data.data)
+        setTotal(data.total)
+        setPage(data.page)
     }
-    useEffect(() => { load(1); }, [q]); // recherche instantanée simple
-    useEffect(() => { load(page); }, [page]); // pagination
+    useEffect(() => { load(1) }, [q]) // recherche instantanée simple
+    useEffect(() => { load(page) }, [page]) // pagination
 
     // ADD
     const { register: regAdd, handleSubmit: handleAdd, reset: resetAdd } = useForm({
         defaultValues: { name: '', email: '', password: '', role: 'KITCHEN', active: true }
-    });
+    })
     async function onAdd(v) {
-        await api.post('/auth/register', { name: v.name, email: v.email, password: v.password, role: v.role });
-        toast.success('Utilisateur créé');
-        setOpenAdd(false); resetAdd({ name: '', email: '', password: '', role: 'KITCHEN', active: true });
-        await load(1);
+        await api.post('/auth/register', { name: v.name, email: v.email, password: v.password, role: v.role })
+        toast.success('Utilisateur créé')
+        setOpenAdd(false)
+        resetAdd({ name: '', email: '', password: '', role: 'KITCHEN', active: true })
+        await load(1)
     }
 
     // EDIT
     const { register: regEdit, handleSubmit: handleEdit, reset: resetEdit } = useForm({
         defaultValues: { name: '', role: 'KITCHEN', active: true, password: '' }
-    });
+    })
     function openEditModal(row) {
-        setEditing(row);
-        resetEdit({ name: row.name, role: row.role, active: row.active, password: '' });
-        setOpenEdit(true);
+        setEditing(row)
+        resetEdit({ name: row.name, role: row.role, active: row.active, password: '' })
+        setOpenEdit(true)
     }
     async function onEdit(v) {
-        const payload = { name: v.name, role: v.role, active: !!v.active };
-        if (v.password) payload.password = v.password;
-        await api.patch(`/users/${editing.id}`, payload);
-        toast.success('Utilisateur mis à jour');
-        setOpenEdit(false);
-        await load(page);
+        const payload = { name: v.name, role: v.role, active: !!v.active }
+        if (v.password) payload.password = v.password
+        await api.patch(`/users/${editing.id}`, payload)
+        toast.success('Utilisateur mis à jour')
+        setOpenEdit(false)
+        await load(page)
     }
 
     // DELETE
-    function askDelete(row) { setToDelete(row); setOpenDel(true); }
+    function askDelete(row) {
+        setToDelete(row)
+        setOpenDel(true)
+    }
     async function doDelete() {
-        await api.delete(`/users/${toDelete.id}`);
-        toast.success('Utilisateur supprimé');
-        setOpenDel(false); setToDelete(null);
-        const newPage = (rows.length === 1 && page > 1) ? page - 1 : page;
-        await load(newPage);
+        await api.delete(`/users/${toDelete.id}`)
+        toast.success('Utilisateur supprimé')
+        setOpenDel(false)
+        setToDelete(null)
+        const newPage = (rows.length === 1 && page > 1) ? page - 1 : page
+        await load(newPage)
     }
 
     return (
@@ -187,9 +194,12 @@ export default function Users() {
                 open={openDel}
                 title="Delete user"
                 message={`Delete "${toDelete?.name}" ?`}
-                onCancel={() => { setOpenDel(false); setToDelete(null); }}
+                onCancel={() => {
+                    setOpenDel(false)
+                    setToDelete(null)
+                }}
                 onConfirm={doDelete}
             />
         </Layout>
-    );
+    )
 }

@@ -1,14 +1,14 @@
 // server/src/routes/ai.routes.js
-import { Router } from 'express';
-import { requireAuth } from '../auth/auth.middleware.js';
-import { a } from '../utils/async.js';
+import { Router } from 'express'
+import { requireAuth } from '../auth/auth.middleware.js'
+import { a } from '../utils/async.js'
 import {
     getSuggestions,
     getAtRiskProducts,
     getMaxPortionsForRecipe
-} from '../services/suggestion.service.js';
+} from '../services/suggestion.service.js'
 
-const r = Router();
+const r = Router()
 
 /**
  * GET /ai/suggestions
@@ -23,15 +23,15 @@ const r = Router();
  *   - at_risk_products: produits avec DLC ≤ 7 jours
  */
 r.get('/suggestions', requireAuth(), a(async (req, res) => {
-    const portions = Math.max(1, parseInt(req.query.portions || '10', 10));
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || '10', 10)));
+    const portions = Math.max(1, parseInt(req.query.portions || '10', 10))
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || '10', 10)))
 
-    const suggestions = await getSuggestions(portions, limit);
-    const atRiskProducts = await getAtRiskProducts(7);
+    const suggestions = await getSuggestions(portions, limit)
+    const atRiskProducts = await getAtRiskProducts(7)
 
     // Statistiques globales
-    const feasibleCount = suggestions.filter(s => s.feasible).length;
-    const urgentCount = suggestions.filter(s => s.feasible && s.urgent_ingredients > 0).length;
+    const feasibleCount = suggestions.filter(s => s.feasible).length
+    const urgentCount = suggestions.filter(s => s.feasible && s.urgent_ingredients > 0).length
 
     res.json({
         params: { portions, limit },
@@ -43,22 +43,22 @@ r.get('/suggestions', requireAuth(), a(async (req, res) => {
         },
         suggestions,
         at_risk_products: atRiskProducts
-    });
-}));
+    })
+}))
 
 /**
  * GET /ai/suggestions/recipe/:id
  * Retourne le nombre maximum de portions réalisables pour une recette.
  */
 r.get('/suggestions/recipe/:id', requireAuth(), a(async (req, res) => {
-    const recipeId = parseInt(req.params.id, 10);
+    const recipeId = parseInt(req.params.id, 10)
     if (isNaN(recipeId)) {
-        return res.status(400).json({ error: 'Invalid recipe ID' });
+        return res.status(400).json({ error: 'Invalid recipe ID' })
     }
 
-    const result = await getMaxPortionsForRecipe(recipeId);
-    res.json(result);
-}));
+    const result = await getMaxPortionsForRecipe(recipeId)
+    res.json(result)
+}))
 
 /**
  * GET /ai/at-risk
@@ -68,11 +68,11 @@ r.get('/suggestions/recipe/:id', requireAuth(), a(async (req, res) => {
  *   - days: seuil en jours (défaut: 7)
  */
 r.get('/at-risk', requireAuth(), a(async (req, res) => {
-    const days = Math.max(1, parseInt(req.query.days || '7', 10));
-    const products = await getAtRiskProducts(days);
+    const days = Math.max(1, parseInt(req.query.days || '7', 10))
+    const products = await getAtRiskProducts(days)
 
     // Grouper par produit pour avoir une vue consolidée
-    const grouped = new Map();
+    const grouped = new Map()
     for (const p of products) {
         if (!grouped.has(p.product_id)) {
             grouped.set(p.product_id, {
@@ -81,17 +81,17 @@ r.get('/at-risk', requireAuth(), a(async (req, res) => {
                 unit: p.unit,
                 total_at_risk: 0,
                 lots: []
-            });
+            })
         }
-        const entry = grouped.get(p.product_id);
-        entry.total_at_risk += p.available;
+        const entry = grouped.get(p.product_id)
+        entry.total_at_risk += p.available
         entry.lots.push({
             lot_id: p.lot_id,
             batch_number: p.batch_number,
             expiry_date: p.expiry_date,
             days_until_expiry: p.days_until_expiry,
             available: p.available
-        });
+        })
     }
 
     res.json({
@@ -99,8 +99,8 @@ r.get('/at-risk', requireAuth(), a(async (req, res) => {
         products_count: grouped.size,
         lots_count: products.length,
         products: Array.from(grouped.values())
-    });
-}));
+    })
+}))
 
 /**
  * POST /ai/simulate
@@ -111,19 +111,19 @@ r.get('/at-risk', requireAuth(), a(async (req, res) => {
  *   - items: [{ recipe_id, portions }]
  */
 r.post('/simulate', requireAuth(), a(async (req, res) => {
-    const { items = [] } = req.body;
+    const { items = [] } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ error: 'items array required' });
+        return res.status(400).json({ error: 'items array required' })
     }
 
-    const results = [];
-    let allFeasible = true;
+    const results = []
+    let allFeasible = true
 
     for (const item of items) {
-        const { recipe_id, portions = 10 } = item;
-        const suggestions = await getSuggestions(portions, 100);
-        const match = suggestions.find(s => s.recipe_id === recipe_id);
+        const { recipe_id, portions = 10 } = item
+        const suggestions = await getSuggestions(portions, 100)
+        const match = suggestions.find(s => s.recipe_id === recipe_id)
 
         if (match) {
             results.push({
@@ -134,23 +134,23 @@ r.post('/simulate', requireAuth(), a(async (req, res) => {
                 fefo_score: match.fefo_score,
                 missing_ingredients: match.missing_ingredients,
                 lots_to_use: match.lots_to_use
-            });
-            if (!match.feasible) allFeasible = false;
+            })
+            if (!match.feasible) allFeasible = false
         } else {
             results.push({
                 recipe_id,
                 portions,
                 feasible: false,
                 error: 'Recipe not found'
-            });
-            allFeasible = false;
+            })
+            allFeasible = false
         }
     }
 
     res.json({
         all_feasible: allFeasible,
         items: results
-    });
-}));
+    })
+}))
 
-export default r;
+export default r

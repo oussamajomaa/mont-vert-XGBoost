@@ -1,13 +1,13 @@
 // server/src/routes/dashboard.routes.js
-import { Router } from 'express';
-import { pool } from '../db.js';
-import { requireAuth } from '../auth/auth.middleware.js';
-import { a } from '../utils/async.js';
+import { Router } from 'express'
+import { pool } from '../db.js'
+import { requireAuth } from '../auth/auth.middleware.js'
+import { a } from '../utils/async.js'
 
-const r = Router();
+const r = Router()
 
 r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, res) => {
-  const days = Number(req.query.days || 30);
+  const days = Number(req.query.days || 30)
 
   // 1) Valeur de stock (actif, non expiré)
   const [[sv]] = await pool.query(
@@ -15,30 +15,30 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
      FROM lot l
      JOIN product p ON p.id=l.product_id
      WHERE l.archived=FALSE AND l.expiry_date >= CURDATE()`
-  );
+  )
 
   // 2) Lots qui expirent bientôt
   const [[exp7]]  = await pool.query(
     `SELECT COUNT(*) AS c FROM lot l
      WHERE l.archived=FALSE AND l.quantity>0
        AND l.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)`
-  );
+  )
   const [[exp14]] = await pool.query(
     `SELECT COUNT(*) AS c FROM lot l
      WHERE l.archived=FALSE AND l.quantity>0
        AND l.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY)`
-  );
+  )
 
   // 2.bis) Lots déjà périmés (à traiter)
   const [[expiredNow]] = await pool.query(
     `SELECT COUNT(*) AS c FROM lot l
      WHERE l.archived=FALSE AND l.quantity>0 AND l.expiry_date < CURDATE()`
-  );
+  )
 
   // 3) Répartition des plans
-  const [plans] = await pool.query(`SELECT status, COUNT(*) AS c FROM meal_plan GROUP BY status`);
-  const planCounts = { DRAFT:0, CONFIRMED:0, EXECUTED:0 };
-  for (const p of plans) planCounts[p.status] = Number(p.c);
+  const [plans] = await pool.query(`SELECT status, COUNT(*) AS c FROM meal_plan GROUP BY status`)
+  const planCounts = { DRAFT:0, CONFIRMED:0, EXECUTED:0 }
+  for (const p of plans) planCounts[p.status] = Number(p.c)
 
   // 4) Séries jour/type avec valeur en euros
   const [series] = await pool.query(
@@ -50,7 +50,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
      WHERE sm.moved_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
      GROUP BY DATE(sm.moved_at), sm.type
      ORDER BY d ASC`, [days]
-  );
+  )
 
   // 5) Totaux 30j en euros
   const [totals] = await pool.query(
@@ -60,9 +60,9 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
      JOIN product p ON p.id=l.product_id
      WHERE sm.moved_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
      GROUP BY sm.type`, [days]
-  );
-  const tmap = { IN:0, OUT:0, ADJUSTMENT:0, LOSS:0 };
-  totals.forEach(t => { tmap[t.type] = Number(t.value_eur); });
+  )
+  const tmap = { IN:0, OUT:0, ADJUSTMENT:0, LOSS:0 }
+  totals.forEach(t => { tmap[t.type] = Number(t.value_eur) })
 
   // Liste des pertes (30j)
   const [losses] = await pool.query(
@@ -74,11 +74,11 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
      JOIN product p ON p.id=l.product_id
      WHERE sm.type='LOSS' AND sm.moved_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
      ORDER BY sm.moved_at DESC LIMIT 100`, [days]
-  );
+  )
 
   // Taux de perte
-  const denom = tmap.OUT + tmap.LOSS;
-  const lossRate = denom > 0 ? Number((tmap.LOSS / denom).toFixed(3)) : 0;
+  const denom = tmap.OUT + tmap.LOSS
+  const lossRate = denom > 0 ? Number((tmap.LOSS / denom).toFixed(3)) : 0
 
   // 6) Top produits consommés (OUT)
   const [topProducts] = await pool.query(
@@ -90,7 +90,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
      GROUP BY p.id, p.name, p.unit
      ORDER BY qty DESC
      LIMIT 8`, [days]
-  );
+  )
 
   // 7) Lots proches de DLC (pas périmés)
   const [expiringLots] = await pool.query(
@@ -102,7 +102,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
        AND l.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 21 DAY)
      ORDER BY l.expiry_date ASC, l.id ASC
      LIMIT 20`
-  );
+  )
 
   // 8) Pertes liées aux expirations (tableau 30j)
   const [expiredRows] = await pool.query(
@@ -116,7 +116,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
        AND m.moved_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
      ORDER BY m.moved_at DESC, m.id DESC
      LIMIT 100`, [days]
-  );
+  )
 
   // 9) Produits en alerte / réappro
   const [lowStock] = await pool.query(
@@ -140,7 +140,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
      HAVING p.alert_threshold > 0 AND available <= p.alert_threshold
      ORDER BY (CASE WHEN p.alert_threshold>0 THEN available/p.alert_threshold ELSE 1 END) ASC
      LIMIT 20`
-  );
+  )
 
   const [toReplenish] = await pool.query(
     `SELECT p.id, p.name, p.unit,
@@ -152,7 +152,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
      GROUP BY p.id
      HAVING stock_qty < p.alert_threshold
      ORDER BY stock_qty ASC`
-  );
+  )
 
   // ========== DONNÉES FEFO ==========
 
@@ -180,17 +180,17 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
       AND l.expiry_date >= CURDATE()
       AND DATEDIFF(l.expiry_date, CURDATE()) <= 7
     ORDER BY l.expiry_date ASC
-  `);
+  `)
 
-  let totalAtRiskQty = 0;
-  let totalAtRiskValue = 0;
-  const uniqueProductsAtRisk = new Set();
+  let totalAtRiskQty = 0
+  let totalAtRiskValue = 0
+  const uniqueProductsAtRisk = new Set()
   for (const r of atRiskProducts) {
-    const available = Number(r.available);
+    const available = Number(r.available)
     if (available > 0) {
-      totalAtRiskQty += available;
-      totalAtRiskValue += available * Number(r.cost);
-      uniqueProductsAtRisk.add(r.product_id);
+      totalAtRiskQty += available
+      totalAtRiskValue += available * Number(r.cost)
+      uniqueProductsAtRisk.add(r.product_id)
     }
   }
 
@@ -208,7 +208,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
     GROUP BY p.id, p.name, p.unit
     ORDER BY total_loss DESC
     LIMIT 5
-  `, [days]);
+  `, [days])
 
   // 12) Économies FEFO estimées
   const [[fefoUsage]] = await pool.query(`
@@ -221,7 +221,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
     WHERE sm.type = 'OUT'
       AND sm.meal_plan_item_id IS NOT NULL
       AND sm.moved_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-  `, [days]);
+  `, [days])
 
   const [[currentLossData]] = await pool.query(`
     SELECT 
@@ -232,22 +232,22 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
     JOIN product p ON p.id = l.product_id
     WHERE sm.type IN ('LOSS', 'EXPIRED')
       AND sm.moved_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-  `, [days]);
+  `, [days])
 
-  const fefoUsed = Number(fefoUsage.total_fefo_used);
-  const fefoValue = Number(fefoUsage.total_fefo_value);
-  const currentLossQty = Number(currentLossData.total_qty);
-  const currentLossValue = Number(currentLossData.total_value);
+  const fefoUsed = Number(fefoUsage.total_fefo_used)
+  const fefoValue = Number(fefoUsage.total_fefo_value)
+  const currentLossQty = Number(currentLossData.total_qty)
+  const currentLossValue = Number(currentLossData.total_value)
   
   // Estimation : sans FEFO, on aurait ~15% de pertes en plus
-  const estimatedSavingsQty = Math.max(0, fefoUsed * 0.15);
-  const estimatedSavingsValue = Math.max(0, fefoValue * 0.15);
+  const estimatedSavingsQty = Math.max(0, fefoUsed * 0.15)
+  const estimatedSavingsValue = Math.max(0, fefoValue * 0.15)
 
   // 13) Comparaison avec période précédente
-  const previousStart = new Date();
-  previousStart.setDate(previousStart.getDate() - days * 2);
-  const currentStart = new Date();
-  currentStart.setDate(currentStart.getDate() - days);
+  const previousStart = new Date()
+  previousStart.setDate(previousStart.getDate() - days * 2)
+  const currentStart = new Date()
+  currentStart.setDate(currentStart.getDate() - days)
 
   const [[previousLoss]] = await pool.query(`
     SELECT 
@@ -258,13 +258,13 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
     JOIN product p ON p.id = l.product_id
     WHERE sm.type IN ('LOSS', 'EXPIRED')
       AND sm.moved_at >= ? AND sm.moved_at < ?
-  `, [previousStart, currentStart]);
+  `, [previousStart, currentStart])
 
-  const previousLossQty = Number(previousLoss.total_qty);
-  const previousLossValue = Number(previousLoss.total_value);
+  const previousLossQty = Number(previousLoss.total_qty)
+  const previousLossValue = Number(previousLoss.total_value)
   const lossChangePercent = previousLossValue > 0 
     ? ((currentLossValue - previousLossValue) / previousLossValue * 100) 
-    : 0;
+    : 0
 
   res.json({
     kpis: {
@@ -317,7 +317,7 @@ r.get('/overview', requireAuth(['ADMIN','KITCHEN','DIRECTOR']), a(async (req, re
         trend: lossChangePercent < -5 ? 'improving' : lossChangePercent > 5 ? 'worsening' : 'stable'
       }
     }
-  });
-}));
+  })
+}))
 
-export default r;
+export default r

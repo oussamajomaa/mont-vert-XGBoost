@@ -1,4 +1,4 @@
-import useDebounce from '../hooks/useDebounce';
+import useDebounce from '../hooks/useDebounce'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import Layout from '../components/Layout'
@@ -6,7 +6,7 @@ import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
 import api from '../api/axios'
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast'
 
 export default function Lots() {
     const [products, setProducts] = useState([])
@@ -15,7 +15,7 @@ export default function Lots() {
     const [pageSize] = useState(10)
     const [total, setTotal] = useState(0)
     const [q, setQ] = useState('')
-    const qDebounced = useDebounce(q, 300);
+    const qDebounced = useDebounce(q, 300)
     const [openForm, setOpenForm] = useState(false)
     const [editing, setEditing] = useState(null)
     const [openConfirm, setOpenConfirm] = useState(false)
@@ -35,7 +35,7 @@ export default function Lots() {
         setTotal(lots.data.total)
         setPage(lots.data.page)
     }
-    useEffect(() => { load(1, qDebounced); }, [qDebounced]);
+    useEffect(() => { load(1, qDebounced) }, [qDebounced])
 
     function openAdd() {
         setEditing(null)
@@ -79,9 +79,9 @@ export default function Lots() {
         try {
             const res = await api.delete(`/lots/${toDelete.id}`)
             if (res.status === 200 && res.data?.message === 'archived') {
-                toast.success('Lot archived');
+                toast.success('Lot archived')
             } else {
-                toast.success('Lot deleted');
+                toast.success('Lot deleted')
             }
             setOpenConfirm(false)
             setToDelete(null)
@@ -181,7 +181,10 @@ export default function Lots() {
                 open={openConfirm}
                 title="Delete lot"
                 message={`Are you sure you want to delete lot #${toDelete?.id} (${toDelete?.batch_number}) ?`}
-                onCancel={() => { setOpenConfirm(false); setToDelete(null) }}
+                onCancel={() => {
+                    setOpenConfirm(false)
+                    setToDelete(null)
+                }}
                 onConfirm={doDelete}
             />
         </Layout>

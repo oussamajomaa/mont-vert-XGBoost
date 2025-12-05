@@ -1,39 +1,39 @@
 
 
 // src/pages/MealPlans.jsx
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import Layout from '../components/Layout';
-import Pagination from '../components/Pagination';
-import Modal from '../components/Modal';
-import api from '../api/axios';
-import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import Layout from '../components/Layout'
+import Pagination from '../components/Pagination'
+import Modal from '../components/Modal'
+import api from '../api/axios'
+import { useForm } from 'react-hook-form'
+import toast from 'react-hot-toast'
 
 export default function MealPlans() {
-  const [plans, setPlans] = useState([]);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState('');
-  const [openCreate, setOpenCreate] = useState(false);
+  const [plans, setPlans] = useState([])
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [status, setStatus] = useState('')
+  const [openCreate, setOpenCreate] = useState(false)
 
   const { register, handleSubmit, reset } = useForm({
     defaultValues: { period_start: '', period_end: '' },
-  });
+  })
 
   async function load(p = page) {
     const { data } = await api.get('/meal-plans', {
       params: { page: p, pageSize, status: status || undefined },
-    });
-    setPlans(data.data);
-    setTotal(data.total);
-    setPage(data.page);
+    })
+    setPlans(data.data)
+    setTotal(data.total)
+    setPage(data.page)
   }
 
   useEffect(() => {
-    load(1);
-  }, [status]);
+    load(1)
+  }, [status])
 
   async function onCreate(values) {
     try {
@@ -41,12 +41,12 @@ export default function MealPlans() {
         period_start: values.period_start,
         period_end: values.period_end,
         items: [],
-      };
-      await api.post('/meal-plans', payload);
-      toast.success('Plan created');
-      setOpenCreate(false);
-      reset({ period_start: '', period_end: '' });
-      await load(1);
+      }
+      await api.post('/meal-plans', payload)
+      toast.success('Plan created')
+      setOpenCreate(false)
+      reset({ period_start: '', period_end: '' })
+      await load(1)
     } catch (e) {
       // l’intercepteur axios affiche déjà l’erreur
     }
@@ -54,15 +54,15 @@ export default function MealPlans() {
 
   async function deletePlan(id, isDraft) {
     if (!isDraft) {
-      toast.error('Only DRAFT plans can be deleted');
-      return;
+      toast.error('Only DRAFT plans can be deleted')
+      return
     }
-    // if (!window.confirm('Delete this plan?')) return;
+    // if (!window.confirm('Delete this plan?')) return
     try {
-      await api.delete(`/meal-plans/${id}`);
-      toast.success('Plan deleted');
-      const newPage = plans.length === 1 && page > 1 ? page - 1 : page;
-      await load(newPage);
+      await api.delete(`/meal-plans/${id}`)
+      toast.success('Plan deleted')
+      const newPage = plans.length === 1 && page > 1 ? page - 1 : page
+      await load(newPage)
     } catch (e) {
       // erreur déjà toastée par axios
     }
@@ -197,6 +197,6 @@ export default function MealPlans() {
         </form>
       </Modal>
     </Layout>
-  );
+  )
 }
 

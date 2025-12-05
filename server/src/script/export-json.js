@@ -28,15 +28,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function exportTrainingDataJSON() {
-    console.log('🚀 Export des données d\'entraînement ML (JSON)\n');
+    console.log(' Export des données d\'entraînement ML (JSON)\n');
     const start = Date.now();
 
     try {
         // ─────────────────────────────────────────────────────────────────────
         // REQUÊTE 1 : Récupérer l'historique des repas
         // ─────────────────────────────────────────────────────────────────────
-        console.log('📊 Étape 1/3 : Récupération de l\'historique des repas...');
-        
+        console.log(' Étape 1/3 : Récupération de l\'historique des repas...');
+
         const [items] = await pool.query(`
             SELECT 
                 mpi.id as item_id,
@@ -67,15 +67,15 @@ async function exportTrainingDataJSON() {
         console.log(`   ✓ ${items.length} repas récupérés\n`);
 
         if (items.length === 0) {
-            console.log('   ⚠️ Aucun historique trouvé');
+            console.log('    Aucun historique trouvé');
             process.exit(0);
         }
 
         // ─────────────────────────────────────────────────────────────────────
         // REQUÊTE 2 : Récupérer les ingrédients de chaque recette
         // ─────────────────────────────────────────────────────────────────────
-        console.log('📊 Étape 2/3 : Récupération des ingrédients par recette...');
-        
+        console.log(' Étape 2/3 : Récupération des ingrédients par recette...');
+
         const [recipeIngredients] = await pool.query(`
             SELECT 
                 ri.recipe_id,
@@ -105,8 +105,8 @@ async function exportTrainingDataJSON() {
         // ─────────────────────────────────────────────────────────────────────
         // REQUÊTE 3 : Récupérer le stock actuel
         // ─────────────────────────────────────────────────────────────────────
-        console.log('📊 Étape 3/3 : Récupération du stock actuel...');
-        
+        console.log(' Étape 3/3 : Récupération du stock actuel...');
+
         const [stockRows] = await pool.query(`
             SELECT 
                 p.id as product_id,
@@ -133,11 +133,11 @@ async function exportTrainingDataJSON() {
         // ─────────────────────────────────────────────────────────────────────
         // ASSEMBLAGE DU DATASET
         // ─────────────────────────────────────────────────────────────────────
-        console.log('🔧 Assemblage du dataset...');
+        console.log(' Assemblage du dataset...');
 
         const dataset = items.map(item => {
             const dateRef = item.execution_date || item.period_start;
-            
+
             // Parsing des dernières recettes
             let lastRecipes = [0, 0];
             if (item.last_recipe_ids_str) {
@@ -189,16 +189,16 @@ async function exportTrainingDataJSON() {
         const fileSize = (fs.statSync(outputPath).size / 1024).toFixed(2);
 
         console.log(`\n${'═'.repeat(60)}`);
-        console.log('✅ EXPORT TERMINÉ !');
+        console.log(' EXPORT TERMINÉ !');
         console.log(`${'═'.repeat(60)}`);
-        console.log(`\n📁 Fichier : ${outputPath}`);
-        console.log(`📊 Taille : ${fileSize} KB`);
-        console.log(`📈 Exemples : ${dataset.length}`);
-        console.log(`🔢 Features : ${outputData.metadata.num_features}`);
-        console.log(`⏱️  Temps : ${elapsed}s\n`);
+        console.log(`\n Fichier : ${outputPath}`);
+        console.log(` Taille : ${fileSize} KB`);
+        console.log(` Exemples : ${dataset.length}`);
+        console.log(` Features : ${outputData.metadata.num_features}`);
+        console.log(`  Temps : ${elapsed}s\n`);
 
     } catch (error) {
-        console.error('\n❌ Erreur :', error.message);
+        console.error('\n Erreur :', error.message);
         console.error(error.stack);
         process.exit(1);
     } finally {
@@ -228,34 +228,34 @@ function calculateRecipeStockFeatures(ingredients, stockMap, plannedPortions = 1
 
     for (const ingredient of ingredients) {
         const stock = stockMap.get(ingredient.product_id);
-        
+
         // Calculer la quantité nécessaire pour le nombre de portions
         const requiredQty = ingredient.required_qty * plannedPortions;
-        
+
         // Vérifier si la quantité disponible est suffisante
         if (!stock || stock.available_qty < requiredQty) {
             nbMissing++;
         } else {
             nbAvailable++;
-            
+
             if (stock.days_to_expiry < minDaysToExpiry) {
                 minDaysToExpiry = stock.days_to_expiry;
             }
-            
+
             const urgency = Math.max(0, Math.min(1, 1 - (stock.days_to_expiry / 30)));
             totalUrgencyScore += urgency;
         }
     }
 
     const totalIngredients = ingredients.length;
-    
+
     return {
         recipe_feasible: nbMissing === 0 ? 1 : 0,
         availability_score: Number((nbAvailable / totalIngredients).toFixed(2)),
         min_days_to_expiry: minDaysToExpiry,
         nb_missing_ingredients: nbMissing,
-        urgency_score: nbAvailable > 0 
-            ? Number((totalUrgencyScore / nbAvailable).toFixed(2)) 
+        urgency_score: nbAvailable > 0
+            ? Number((totalUrgencyScore / nbAvailable).toFixed(2))
             : 0
     };
 }

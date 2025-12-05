@@ -1,121 +1,121 @@
 // web/src/pages/AiSuggestions.jsx
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Layout from '../components/Layout';
-import api from '../api/axios';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Layout from '../components/Layout'
+import api from '../api/axios'
+import toast from 'react-hot-toast'
 
 export default function AiSuggestions() {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [portions, setPortions] = useState(10);
-    const [limit, setLimit] = useState(10);
-    const [creating, setCreating] = useState(false);
-    const [draftPlan, setDraftPlan] = useState(null); // Plan DRAFT actuel
-    const [draftItems, setDraftItems] = useState([]); // Recettes déjà dans le plan
-    const [maxPortions, setMaxPortions] = useState({}); // Portions max par recette
-    const navigate = useNavigate();
+    const [data, setData] = useState(null)
+    const [loading, setLoading] = useState(true)
+    const [portions, setPortions] = useState(10)
+    const [limit, setLimit] = useState(10)
+    const [creating, setCreating] = useState(false)
+    const [draftPlan, setDraftPlan] = useState(null) // Plan DRAFT actuel
+    const [draftItems, setDraftItems] = useState([]) // Recettes déjà dans le plan
+    const [maxPortions, setMaxPortions] = useState({}) // Portions max par recette
+    const navigate = useNavigate()
 
     // Charger les suggestions
     async function load() {
-        setLoading(true);
+        setLoading(true)
         try {
             const { data } = await api.get('/ai/suggestions', {
                 params: { portions, limit }
-            });
-            setData(data);
-            
+            })
+            setData(data)
+
             // Charger les portions max pour les recettes réalisables
             if (data?.suggestions) {
-                const feasible = data.suggestions.filter(s => s.feasible);
-                loadMaxPortions(feasible);
+                const feasible = data.suggestions.filter(s => s.feasible)
+                loadMaxPortions(feasible)
             }
         } catch (e) {
-            toast.error('Erreur lors du chargement des suggestions');
+            toast.error('Erreur lors du chargement des suggestions')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
     }
 
     // Charger les portions max pour chaque recette
     async function loadMaxPortions(suggestions) {
-        const newMaxPortions = {};
-        
+        const newMaxPortions = {}
+
         // Charger en parallèle (max 5 à la fois pour éviter trop de requêtes)
-        const chunks = [];
+        const chunks = []
         for (let i = 0; i < suggestions.length; i += 5) {
-            chunks.push(suggestions.slice(i, i + 5));
+            chunks.push(suggestions.slice(i, i + 5))
         }
-        
+
         for (const chunk of chunks) {
             await Promise.all(chunk.map(async (sug) => {
                 try {
-                    const { data } = await api.get(`/ai/suggestions/recipe/${sug.recipe_id}`);
-                    newMaxPortions[sug.recipe_id] = data;
+                    const { data } = await api.get(`/ai/suggestions/recipe/${sug.recipe_id}`)
+                    newMaxPortions[sug.recipe_id] = data
                 } catch (e) {
-                    console.error(`Erreur portions max recette ${sug.recipe_id}:`, e);
+                    console.error(`Erreur portions max recette ${sug.recipe_id}:`, e)
                 }
-            }));
+            }))
         }
-        
-        setMaxPortions(newMaxPortions);
+
+        setMaxPortions(newMaxPortions)
     }
 
     // Charger le plan DRAFT actuel (s'il existe)
     async function loadDraftPlan() {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toISOString().split('T')[0]
             const { data: plansResponse } = await api.get('/meal-plans', {
                 params: { status: 'DRAFT' }
-            });
-            
+            })
+
             const draftPlanToday = plansResponse.data?.find(plan => {
-                const planDate = plan.period_start.split('T')[0];
-                return planDate === today;
-            });
-            
+                const planDate = plan.period_start.split('T')[0]
+                return planDate === today
+            })
+
             if (draftPlanToday) {
-                setDraftPlan(draftPlanToday);
+                setDraftPlan(draftPlanToday)
                 // Charger les items du plan
-                const { data: items } = await api.get(`/meal-plans/${draftPlanToday.id}/items`);
-                setDraftItems(items);
+                const { data: items } = await api.get(`/meal-plans/${draftPlanToday.id}/items`)
+                setDraftItems(items)
             } else {
-                setDraftPlan(null);
-                setDraftItems([]);
+                setDraftPlan(null)
+                setDraftItems([])
             }
         } catch (e) {
-            console.error('Erreur chargement plan DRAFT:', e);
+            console.error('Erreur chargement plan DRAFT:', e)
         }
     }
 
     async function addToPlan(suggestion) {
-        if (creating) return;
-        
-        setCreating(true);
+        if (creating) return
+
+        setCreating(true)
         try {
-            const today = new Date().toISOString().split('T')[0];
-            
-            let planId;
-            
+            const today = new Date().toISOString().split('T')[0]
+
+            let planId
+
             if (draftPlan) {
                 // Ajouter au plan DRAFT existant
-                planId = draftPlan.id;
-                
+                planId = draftPlan.id
+
                 // Vérifier si la recette existe déjà
-                const alreadyExists = draftItems.some(item => item.recipe_id === suggestion.recipe_id);
-                
+                const alreadyExists = draftItems.some(item => item.recipe_id === suggestion.recipe_id)
+
                 if (alreadyExists) {
-                    toast.error(`${suggestion.recipe_name} est déjà dans le plan`);
-                    setCreating(false);
-                    return;
+                    toast.error(`${suggestion.recipe_name} est déjà dans le plan`)
+                    setCreating(false)
+                    return
                 }
-                
+
                 await api.post(`/meal-plans/${planId}/items`, {
                     recipe_id: suggestion.recipe_id,
                     planned_portions: suggestion.portions
-                });
-                
-                toast.success(`${suggestion.recipe_name} ajouté au plan`);
+                })
+
+                toast.success(`${suggestion.recipe_name} ajouté au plan`)
             } else {
                 // Créer un nouveau plan DRAFT
                 const { data: plan } = await api.post('/meal-plans', {
@@ -127,43 +127,43 @@ export default function AiSuggestions() {
                             planned_portions: suggestion.portions
                         }
                     ]
-                });
-                
-                planId = plan.id;
-                toast.success(`Plan créé avec ${suggestion.recipe_name}`);
+                })
+
+                planId = plan.id
+                toast.success(`Plan créé avec ${suggestion.recipe_name}`)
             }
-            
+
             // Recharger le plan DRAFT (mise à jour du compteur)
-            await loadDraftPlan();
-            
+            await loadDraftPlan()
+
         } catch (e) {
-            console.error(e);
-            toast.error('Erreur lors de l\'ajout au plan');
+            console.error(e)
+            toast.error('Erreur lors de l\'ajout au plan')
         } finally {
-            setCreating(false);
+            setCreating(false)
         }
     }
 
     // Vérifier si une recette est déjà dans le plan
     function isInPlan(recipeId) {
-        return draftItems.some(item => item.recipe_id === recipeId);
+        return draftItems.some(item => item.recipe_id === recipeId)
     }
 
     useEffect(() => {
-        load();
-        loadDraftPlan();
-    }, []);
+        load()
+        loadDraftPlan()
+    }, [])
 
     useEffect(() => {
-        load();
-    }, [portions, limit]);
+        load()
+    }, [portions, limit])
 
-    if (loading) return <Layout><div className="text-slate-500">Chargement des suggestions IA...</div></Layout>;
-    if (!data) return <Layout><div className="text-red-600">Aucune donnée disponible</div></Layout>;
+    if (loading) return <Layout><div className="text-slate-500">Chargement des suggestions IA...</div></Layout>
+    if (!data) return <Layout><div className="text-red-600">Aucune donnée disponible</div></Layout>
 
-    const { stats, suggestions, at_risk_products } = data;
-    const feasibleSuggestions = suggestions.filter(s => s.feasible);
-    const unfeasibleSuggestions = suggestions.filter(s => !s.feasible);
+    const { stats, suggestions, at_risk_products } = data
+    const feasibleSuggestions = suggestions.filter(s => s.feasible)
+    const unfeasibleSuggestions = suggestions.filter(s => !s.feasible)
 
     return (
         <Layout>
@@ -258,9 +258,9 @@ export default function AiSuggestions() {
                         </div>
                         <div className="divide-y max-h-[600px] overflow-y-auto">
                             {feasibleSuggestions.map((sug, idx) => (
-                                <SuggestionCard 
-                                    key={sug.recipe_id} 
-                                    suggestion={sug} 
+                                <SuggestionCard
+                                    key={sug.recipe_id}
+                                    suggestion={sug}
                                     rank={idx + 1}
                                     onAddToPlan={addToPlan}
                                     disabled={creating}
@@ -313,7 +313,7 @@ export default function AiSuggestions() {
                 </div>
             </div>
         </Layout>
-    );
+    )
 }
 
 function StatCard({ title, value, color = 'blue' }) {
@@ -322,33 +322,33 @@ function StatCard({ title, value, color = 'blue' }) {
         green: 'text-green-600',
         orange: 'text-orange-600',
         red: 'text-red-600'
-    };
+    }
 
     return (
         <div className="bg-white rounded shadow p-4">
             <div className="text-sm text-slate-500">{title}</div>
             <div className={`text-2xl font-semibold ${colors[color]}`}>{value}</div>
         </div>
-    );
+    )
 }
 
 function SuggestionCard({ suggestion, rank, onAddToPlan, disabled, inPlan, maxPortionsData }) {
-    const { recipe_name, fefo_score, urgent_ingredients, total_ingredients, reason, lots_to_use } = suggestion;
+    const { recipe_name, fefo_score, urgent_ingredients, total_ingredients, reason, lots_to_use } = suggestion
 
     const getScoreColor = (score) => {
-        if (score >= 70) return 'bg-red-100 text-red-700 border-red-300';
-        if (score >= 40) return 'bg-orange-100 text-orange-700 border-orange-300';
-        return 'bg-green-100 text-green-700 border-green-300';
-    };
+        if (score >= 70) return 'bg-red-100 text-red-700 border-red-300'
+        if (score >= 40) return 'bg-orange-100 text-orange-700 border-orange-300'
+        return 'bg-green-100 text-green-700 border-green-300'
+    }
 
     const getUrgencyIcon = (urgentCount) => {
-        if (urgentCount >= 3) return '🔴';
-        if (urgentCount >= 1) return '🟠';
-        return '🟢';
-    };
+        if (urgentCount >= 3) return '🔴'
+        if (urgentCount >= 1) return '🟠'
+        return '🟢'
+    }
 
-    const maxPortions = maxPortionsData?.max_portions || 0;
-    const limitingIngredient = maxPortionsData?.limiting_ingredient?.product_name || null;
+    const maxPortions = maxPortionsData?.max_portions || 0
+    const limitingIngredient = maxPortionsData?.limiting_ingredient?.product_name || null
 
     return (
         <div className={`p-4 transition ${inPlan ? 'bg-green-50 border-l-4 border-green-500' : 'hover:bg-slate-50'}`}>
@@ -424,7 +424,7 @@ function SuggestionCard({ suggestion, rank, onAddToPlan, disabled, inPlan, maxPo
                         ✓ Ajouté
                     </span>
                 ) : (
-                    <button 
+                    <button
                         onClick={() => onAddToPlan(suggestion)}
                         disabled={disabled}
                         className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -434,11 +434,11 @@ function SuggestionCard({ suggestion, rank, onAddToPlan, disabled, inPlan, maxPo
                 )}
             </div>
         </div>
-    );
+    )
 }
 
 function UnfeasibleCard({ suggestion }) {
-    const { recipe_name, missing_ingredients } = suggestion;
+    const { recipe_name, missing_ingredients } = suggestion
 
     return (
         <div className="p-4 opacity-60">
@@ -457,21 +457,21 @@ function UnfeasibleCard({ suggestion }) {
                 )}
             </ul>
         </div>
-    );
+    )
 }
 
 function AtRiskProductCard({ product }) {
-    const { product_name, unit, days_until_expiry, available, expiry_date } = product;
+    const { product_name, unit, days_until_expiry, available, expiry_date } = product
 
     const getUrgencyColor = (days) => {
-        if (days <= 2) return 'border-l-4 border-red-500 bg-red-50';
-        if (days <= 5) return 'border-l-4 border-orange-500 bg-orange-50';
-        return 'border-l-4 border-yellow-500 bg-yellow-50';
-    };
+        if (days <= 2) return 'border-l-4 border-red-500 bg-red-50'
+        if (days <= 5) return 'border-l-4 border-orange-500 bg-orange-50'
+        return 'border-l-4 border-yellow-500 bg-yellow-50'
+    }
 
     const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-    };
+        return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+    }
 
     return (
         <div className={`p-3 ${getUrgencyColor(days_until_expiry)}`}>
@@ -487,5 +487,5 @@ function AtRiskProductCard({ product }) {
                 )}
             </div>
         </div>
-    );
+    )
 }

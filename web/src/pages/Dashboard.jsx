@@ -1,9 +1,9 @@
 // src/pages/Dashboard.jsx
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Layout from '../components/Layout';
-import api from '../api/axios';
-import { Line, Doughnut, Bar } from 'react-chartjs-2';
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Layout from '../components/Layout'
+import api from '../api/axios'
+import { Line, Doughnut, Bar } from 'react-chartjs-2'
 import {
 	Chart as ChartJS,
 	LineElement,
@@ -14,11 +14,11 @@ import {
 	BarElement,
 	Tooltip,
 	Legend,
-} from 'chart.js';
-import { format, parseISO } from 'date-fns';
-import { palette, categorical, commonOptions } from '../chart/theme';
-import toast from 'react-hot-toast';
-import { useAuth } from '../auth/AuthContext';
+} from 'chart.js'
+import { format, parseISO } from 'date-fns'
+import { palette, categorical, commonOptions } from '../chart/theme'
+import toast from 'react-hot-toast'
+import { useAuth } from '../auth/AuthContext'
 
 ChartJS.register(
 	LineElement,
@@ -29,54 +29,54 @@ ChartJS.register(
 	BarElement,
 	Tooltip,
 	Legend
-);
+)
 
 const euro = (v) =>
 	new Intl.NumberFormat('fr-FR', {
 		style: 'currency',
 		currency: 'EUR',
-	}).format(v);
+	}).format(v)
 
 export default function Dashboard() {
-	const [data, setData] = useState(null);
-	const [loading, setLoading] = useState(true);
-	const [sendingAlert, setSendingAlert] = useState(false);
-	const { user } = useAuth();
-	const navigate = useNavigate();
+	const [data, setData] = useState(null)
+	const [loading, setLoading] = useState(true)
+	const [sendingAlert, setSendingAlert] = useState(false)
+	const { user } = useAuth()
+	const navigate = useNavigate()
 
 	async function load() {
-		setLoading(true);
-		const { data } = await api.get('/dashboard/overview', { params: { days: 30 } });
-		setData(data);
-		setLoading(false);
+		setLoading(true)
+		const { data } = await api.get('/dashboard/overview', { params: { days: 30 } })
+		setData(data)
+		setLoading(false)
 	}
 
 	async function processExpired() {
 		try {
-			const { data: res } = await api.post('/lots/expire');
+			const { data: res } = await api.post('/lots/expire')
 			toast.success(
 				`Périmés traités · lots: ${res.lotsProcessed} · pertes: ${Number(
 					res.totalLoss
 				).toFixed(3)}`
-			);
-			await load();
+			)
+			await load()
 		} catch (e) {
 			// l'intercepteur axios s'occupe déjà d'afficher l'erreur
 		}
 	}
 
 	async function sendTestAlert() {
-		setSendingAlert(true);
+		setSendingAlert(true)
 		try {
-			const { data: res } = await api.post('/alerts/test');
+			const { data: res } = await api.post('/alerts/test')
 			if (res.sent) {
 				if (res.useEthereal && res.results?.[0]?.previewUrl) {
 					toast.success(
 						<div>
 							<div>Email de test envoyé !</div>
-							<a 
-								href={res.results[0].previewUrl} 
-								target="_blank" 
+							<a
+								href={res.results[0].previewUrl}
+								target="_blank"
 								rel="noopener noreferrer"
 								className="text-blue-600 underline text-sm"
 							>
@@ -84,30 +84,30 @@ export default function Dashboard() {
 							</a>
 						</div>,
 						{ duration: 10000 }
-					);
+					)
 				} else {
-					toast.success(`Email envoyé à ${res.test_recipient}`);
+					toast.success(`Email envoyé à ${res.test_recipient}`)
 				}
 			} else {
-				toast.error(res.message || 'Aucun produit à risque');
+				toast.error(res.message || 'Aucun produit à risque')
 			}
 		} catch (e) {
-			toast.error('Erreur lors de l\'envoi');
+			toast.error('Erreur lors de l\'envoi')
 		} finally {
-			setSendingAlert(false);
+			setSendingAlert(false)
 		}
 	}
 
 	useEffect(() => {
-		load();
-	}, []);
+		load()
+	}, [])
 
 	if (loading) {
 		return (
 			<Layout>
 				<div className="text-slate-500">Loading…</div>
 			</Layout>
-		);
+		)
 	}
 
 	if (!data) {
@@ -115,10 +115,10 @@ export default function Dashboard() {
 			<Layout>
 				<div className="text-red-600">No data</div>
 			</Layout>
-		);
+		)
 	}
 
-	const { kpis, series, topProducts, expiringLots, losses, toReplenish, fefo } = data;
+	const { kpis, series, topProducts, expiringLots, losses, toReplenish, fefo } = data
 
 	// ============================
 	// Courbe des mouvements (30j, €)
@@ -131,15 +131,15 @@ export default function Dashboard() {
 				: s.qty != null
 					? Number(s.qty)
 					: 0,
-	}));
+	}))
 
-	const days = Array.from(new Set(seriesNorm.map((s) => s.d))).sort();
+	const days = Array.from(new Set(seriesNorm.map((s) => s.d))).sort()
 
 	const serieType = (type) =>
 		days.map((d) => {
-			const row = seriesNorm.find((s) => s.d === d && s.type === type);
-			return row ? row.val : 0;
-		});
+			const row = seriesNorm.find((s) => s.d === d && s.type === type)
+			return row ? row.val : 0
+		})
 
 	const lineData = {
 		labels: days.map((d) => format(parseISO(d), 'dd/MM')),
@@ -177,7 +177,7 @@ export default function Dashboard() {
 				tension: 0.25,
 			},
 		],
-	};
+	}
 
 	const optionsCurrency = {
 		...commonOptions,
@@ -190,13 +190,13 @@ export default function Dashboard() {
 				},
 			},
 		},
-	};
+	}
 
 	// ============================
 	// Donut de répartition
 	// ============================
-	const totals = kpis.totals_30d || { IN: 0, OUT: 0, ADJUSTMENT: 0, LOSS: 0 };
-	const doughLabels = ['IN', 'OUT', 'ADJ', 'LOSS'];
+	const totals = kpis.totals_30d || { IN: 0, OUT: 0, ADJUSTMENT: 0, LOSS: 0 }
+	const doughLabels = ['IN', 'OUT', 'ADJ', 'LOSS']
 	const doughData = {
 		labels: doughLabels,
 		datasets: [
@@ -210,7 +210,7 @@ export default function Dashboard() {
 				],
 			},
 		],
-	};
+	}
 
 	// ============================
 	// Top produits consommés
@@ -226,16 +226,16 @@ export default function Dashboard() {
 				),
 			},
 		],
-	};
+	}
 
-	const lossesList = losses || [];
-	const replen = toReplenish || [];
+	const lossesList = losses || []
+	const replen = toReplenish || []
 
 	// FEFO data
-	const atRisk = fefo?.at_risk || { products_count: 0, total_qty: 0, estimated_value: 0 };
-	const savings = fefo?.savings || { plans_executed: 0, estimated_savings_eur: 0 };
-	const comparison = fefo?.comparison || { change_percent: 0, trend: 'stable' };
-	const topWasted = fefo?.top_wasted || [];
+	const atRisk = fefo?.at_risk || { products_count: 0, total_qty: 0, estimated_value: 0 }
+	const savings = fefo?.savings || { plans_executed: 0, estimated_savings_eur: 0 }
+	const comparison = fefo?.comparison || { change_percent: 0, trend: 'stable' }
+	const topWasted = fefo?.top_wasted || []
 
 	return (
 		<Layout>
@@ -252,14 +252,14 @@ export default function Dashboard() {
 									{atRisk.products_count} produit(s) à risque
 								</div>
 								<div className="text-sm text-amber-600">
-									{atRisk.total_qty.toFixed(2)} kg expirent dans ≤7 jours 
+									{atRisk.total_qty.toFixed(2)} kg expirent dans ≤7 jours
 									(valeur: {euro(atRisk.estimated_value)})
 								</div>
 							</div>
 						</div>
 						<div className="flex items-center gap-2">
 							{user?.role === 'ADMIN' && (
-								<button 
+								<button
 									onClick={sendTestAlert}
 									disabled={sendingAlert}
 									className="px-3 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 transition text-sm disabled:opacity-50"
@@ -267,7 +267,7 @@ export default function Dashboard() {
 									{sendingAlert ? '📧 Envoi...' : '📧 Tester alerte'}
 								</button>
 							)}
-							<button 
+							<button
 								onClick={() => navigate('/ai-suggestions')}
 								className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 transition"
 							>
@@ -304,7 +304,7 @@ export default function Dashboard() {
 					title="Taux de perte (30j)"
 					value={`${(kpis.loss_rate_30d * 100).toFixed(1)} %`}
 				/>
-				
+
 				{/* Économies FEFO */}
 				<div className="bg-white rounded shadow p-4 border-l-4 border-green-500">
 					<div className="text-sm text-slate-500">Économies FEFO</div>
@@ -348,7 +348,7 @@ export default function Dashboard() {
 					<div className="font-semibold mb-2">Top produits consommés (30j)</div>
 					<Bar data={barData} options={optionsCurrency} />
 				</div>
-				
+
 				{/* Top produits gaspillés */}
 				<div className="bg-white rounded shadow p-4">
 					<div className="font-semibold mb-2">🗑️ Top produits gaspillés (30j)</div>
@@ -356,9 +356,8 @@ export default function Dashboard() {
 						<div className="space-y-2">
 							{topWasted.map((product, idx) => (
 								<div key={product.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded">
-									<div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
-										idx === 0 ? 'bg-red-500' : idx === 1 ? 'bg-orange-500' : 'bg-yellow-500'
-									}`}>
+									<div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${idx === 0 ? 'bg-red-500' : idx === 1 ? 'bg-orange-500' : 'bg-yellow-500'
+										}`}>
 										{idx + 1}
 									</div>
 									<div className="flex-1">
@@ -396,9 +395,9 @@ export default function Dashboard() {
 						<tbody>
 							{replen && replen.length > 0 ? (
 								replen.map((r) => {
-									const stock = Number(r.stock_qty ?? 0);
-									const threshold = Number(r.alert_threshold ?? 0);
-									const gap = Math.max(0, threshold - stock);
+									const stock = Number(r.stock_qty ?? 0)
+									const threshold = Number(r.alert_threshold ?? 0)
+									const gap = Math.max(0, threshold - stock)
 									return (
 										<tr key={r.id} className="border-t">
 											<td className="px-3 py-2">
@@ -411,7 +410,7 @@ export default function Dashboard() {
 												{gap > 0 ? gap.toFixed(3) : '—'}
 											</td>
 										</tr>
-									);
+									)
 								})
 							) : (
 								<tr>
@@ -548,7 +547,7 @@ export default function Dashboard() {
 				</div>
 			</div>
 		</Layout>
-	);
+	)
 }
 
 function Card({ title, value }) {
@@ -557,5 +556,5 @@ function Card({ title, value }) {
 			<div className="text-sm text-slate-500">{title}</div>
 			<div className="text-2xl font-semibold">{value}</div>
 		</div>
-	);
+	)
 }

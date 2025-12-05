@@ -41,7 +41,7 @@ def load_model():
             model = saved_data['model']
             feature_names = saved_data['feature_names']
             label_encoder = saved_data.get('label_encoder')  # Peut être None pour anciens modèles
-        print(f"✅ Modèle chargé : {len(feature_names)} features, {len(label_encoder.classes_) if label_encoder else 0} classes")
+        print(f" Modèle chargé : {len(feature_names)} features, {len(label_encoder.classes_) if label_encoder else 0} classes")
         return True
     return False
 
@@ -58,8 +58,8 @@ def save_model(trained_model, features, encoder):
             'feature_names': feature_names,
             'label_encoder': label_encoder
         }, f)
-    print(f"✅ Modèle sauvegardé : {len(feature_names)} features, {len(label_encoder.classes_)} classes")
-    print(f"   📁 Chemin : {MODEL_PATH}")
+    print(f" Modèle sauvegardé : {len(feature_names)} features, {len(label_encoder.classes_)} classes")
+    print(f"    Chemin : {MODEL_PATH}")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ENTRAÎNEMENT
@@ -102,7 +102,7 @@ def train():
                 'error': 'Aucune donnée d\'entraînement fournie'
             }), 400
         
-        print(f"\n🚀 Entraînement avec {len(training_data)} exemples...")
+        print(f"\n Entraînement avec {len(training_data)} exemples...")
         
         # Conversion en DataFrame
         df = pd.DataFrame(training_data)
@@ -134,20 +134,20 @@ def train():
         X = df[feature_columns].fillna(0)
         y_raw = df['recipe_id']
         
-        print(f"   📊 Matrice X : {X.shape}")
-        print(f"   📊 Features : {list(X.columns)}")
-        print(f"   🎯 Classes uniques : {y_raw.nunique()}")
-        print(f"   🎯 Recipe IDs : {sorted(y_raw.unique())}")
+        print(f"    Matrice X : {X.shape}")
+        print(f"    Features : {list(X.columns)}")
+        print(f"    Classes uniques : {y_raw.nunique()}")
+        print(f"    Recipe IDs : {sorted(y_raw.unique())}")
         
         # Encoder les labels (recipe_id → 0-indexed)
         from sklearn.preprocessing import LabelEncoder
         label_encoder = LabelEncoder()
         y = label_encoder.fit_transform(y_raw)
         
-        print(f"   🔄 Encodage : {list(y_raw.unique())[:5]} → {list(set(y))[:5]}")
+        print(f"    Encodage : {list(y_raw.unique())[:5]} → {list(set(y))[:5]}")
         
         # Entraîner XGBoost
-        print("   🧠 Entraînement XGBoost...")
+        print("    Entraînement XGBoost...")
         
         xgb_model = xgb.XGBClassifier(
             n_estimators=100,
@@ -180,9 +180,9 @@ def train():
             reverse=True
         )
         
-        print(f"\n✅ Entraînement terminé !")
+        print(f"\n Entraînement terminé !")
         print(f"   Accuracy : {train_accuracy:.1f}%")
-        print(f"\n📊 Feature Importance :")
+        print(f"\n Feature Importance :")
         for feat, imp in sorted_importance:
             print(f"   {feat:25s} : {imp*100:5.1f}%")
         
@@ -198,7 +198,7 @@ def train():
         })
         
     except Exception as e:
-        print(f"❌ Erreur d'entraînement : {str(e)}")
+        print(f" Erreur d'entraînement : {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -315,7 +315,7 @@ def predict():
         })
         
     except Exception as e:
-        print(f"❌ Erreur de prédiction : {str(e)}")
+        print(f" Erreur de prédiction : {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -366,7 +366,7 @@ def model_info():
     if model is None:
         if not load_model():
             return jsonify({
-                'trained': False,  # ✅ Retourner 'trained' pour React
+                'trained': False,  #  Retourner 'trained' pour React
                 'available': False,
                 'error': 'Modèle non entraîné'
             })
@@ -374,7 +374,7 @@ def model_info():
     try:
         importance = model.feature_importances_
         feature_importance = {
-            feature_names[i]: float(importance[i])  # ✅ Valeur brute (0-1)
+            feature_names[i]: float(importance[i])  #  Valeur brute (0-1)
             for i in range(len(feature_names))
         }
         
@@ -385,7 +385,7 @@ def model_info():
             classes = model.classes_
         
         return jsonify({
-            'trained': True,  # ✅ Ajouter 'trained' pour React
+            'trained': True,  #  Ajouter 'trained' pour React
             'available': True,
             'num_features': len(feature_names),
             'features': feature_names,
@@ -422,7 +422,7 @@ def feature_importance_endpoint():
         feature_importance = [
             {
                 'feature': feature_names[i],
-                'importance': float(importance[i])  # ✅ Valeur brute (0-1), React fera *100
+                'importance': float(importance[i])  #  Valeur brute (0-1), React fera *100
             }
             for i in range(len(feature_names))
         ]
@@ -432,7 +432,7 @@ def feature_importance_endpoint():
         
         return jsonify({
             'available': True,
-            'feature_importance': feature_importance  # ✅ Nom correct pour React
+            'feature_importance': feature_importance  #  Nom correct pour React
         })
         
     except Exception as e:
@@ -446,13 +446,13 @@ def feature_importance_endpoint():
 # ═══════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    print("🚀 Démarrage du service ML Mont-Vert")
+    print(" Démarrage du service ML Mont-Vert")
     print("   Features attendues : 11 (6 temporelles + 5 stock)")
-    print(f"   📁 Modèle sauvegardé dans : {MODEL_PATH}")
+    print(f"    Modèle sauvegardé dans : {MODEL_PATH}")
     
     # Charger le modèle existant s'il existe
     if load_model():
-        print(f"   ✅ Modèle existant chargé")
+        print(f"    Modèle existant chargé")
     else:
         print(f"   ⚠️ Aucun modèle existant - en attente d'entraînement")
     

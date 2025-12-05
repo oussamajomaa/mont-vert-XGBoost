@@ -1,104 +1,104 @@
-import { useState, useEffect } from 'react';
-import Layout from '../components/Layout';
-import api from '../api/axios';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from 'react'
+import Layout from '../components/Layout'
+import api from '../api/axios'
+import toast from 'react-hot-toast'
 
 export default function MlPredictions() {
-    const [predictions, setPredictions] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [training, setTraining] = useState(false);
-    const [mlHealth, setMlHealth] = useState(null);
-    const [modelInfo, setModelInfo] = useState(null);
-    const [featureImportance, setFeatureImportance] = useState([]);
-    const [trainingData, setTrainingData] = useState(null);
+    const [predictions, setPredictions] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [training, setTraining] = useState(false)
+    const [mlHealth, setMlHealth] = useState(null)
+    const [modelInfo, setModelInfo] = useState(null)
+    const [featureImportance, setFeatureImportance] = useState([])
+    const [trainingData, setTrainingData] = useState(null)
     
     // Paramètres de prédiction
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-    const [portions, setPortions] = useState(50);
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+    const [portions, setPortions] = useState(50)
     
     // Vérifier la santé du service ML au chargement
     useEffect(() => {
-        checkHealth();
-        loadModelInfo();
-    }, []);
+        checkHealth()
+        loadModelInfo()
+    }, [])
 
     const checkHealth = async () => {
         try {
-            const res = await api.get('/ml/health');
-            setMlHealth(res.data);
+            const res = await api.get('/ml/health')
+            setMlHealth(res.data)
         } catch (err) {
-            setMlHealth({ status: 'error', message: 'Service ML non disponible' });
+            setMlHealth({ status: 'error', message: 'Service ML non disponible' })
         }
-    };
+    }
 
     const loadModelInfo = async () => {
         try {
-            const res = await api.get('/ml/model-info');
-            setModelInfo(res.data);
+            const res = await api.get('/ml/model-info')
+            setModelInfo(res.data)
             
             if (res.data.trained) {
-                const featRes = await api.get('/ml/feature-importance');
-                setFeatureImportance(featRes.data.feature_importance || []);
+                const featRes = await api.get('/ml/feature-importance')
+                setFeatureImportance(featRes.data.feature_importance || [])
             }
         } catch (err) {
-            console.error('Erreur chargement model info:', err);
+            console.error('Erreur chargement model info:', err)
         }
-    };
+    }
 
     const loadTrainingData = async () => {
         try {
-            const res = await api.get('/ml/training-data');
-            setTrainingData(res.data);
+            const res = await api.get('/ml/training-data')
+            setTrainingData(res.data)
         } catch (err) {
-            toast.error('Erreur chargement données');
+            toast.error('Erreur chargement données')
         }
-    };
+    }
 
     const handleTrain = async () => {
-        setTraining(true);
+        setTraining(true)
         try {
-            const res = await api.post('/ml/train');
-            toast.success(`Modèle entraîné ! Accuracy: ${(res.data.metrics.accuracy * 100).toFixed(1)}%`);
-            await loadModelInfo();
+            const res = await api.post('/ml/train')
+            toast.success(`Modèle entraîné ! Accuracy: ${(res.data.metrics.accuracy * 100).toFixed(1)}%`)
+            await loadModelInfo()
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Erreur entraînement');
+            toast.error(err.response?.data?.error || 'Erreur entraînement')
         } finally {
-            setTraining(false);
+            setTraining(false)
         }
-    };
+    }
 
     const handlePredict = async () => {
-        setLoading(true);
+        setLoading(true)
         try {
-            const res = await api.post('/ml/predict', { date, planned_portions: portions });
-            setPredictions(res.data.predictions || []);
+            const res = await api.post('/ml/predict', { date, planned_portions: portions })
+            setPredictions(res.data.predictions || [])
             if (res.data.predictions?.length === 0) {
-                toast('Aucune prédiction disponible. Entraînez d\'abord le modèle.', { icon: '⚠️' });
+                toast('Aucune prédiction disponible. Entraînez d\'abord le modèle.', { icon: '⚠️' })
             }
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Erreur prédiction');
+            toast.error(err.response?.data?.error || 'Erreur prédiction')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     const getConfidenceColor = (confidence) => {
         switch (confidence) {
-            case 'high': return 'bg-green-100 text-green-800 border-green-300';
-            case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-            case 'low': return 'bg-red-100 text-red-800 border-red-300';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'high': return 'bg-green-100 text-green-800 border-green-300'
+            case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+            case 'low': return 'bg-red-100 text-red-800 border-red-300'
+            default: return 'bg-gray-100 text-gray-800'
         }
-    };
+    }
 
     const getConfidenceLabel = (confidence) => {
         switch (confidence) {
-            case 'high': return 'Haute confiance';
-            case 'medium': return 'Confiance moyenne';
-            case 'low': return 'Faible confiance';
-            default: return confidence;
+            case 'high': return 'Haute confiance'
+            case 'medium': return 'Confiance moyenne'
+            case 'low': return 'Faible confiance'
+            default: return confidence
         }
-    };
+    }
 
     return (
         <Layout>
@@ -411,5 +411,5 @@ export default function MlPredictions() {
             </div>
         </div>
         </Layout>
-    );
+    )
 }

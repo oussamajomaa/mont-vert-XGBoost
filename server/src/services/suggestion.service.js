@@ -1,5 +1,5 @@
 // server/src/services/suggestion.service.js
-import { pool } from '../db.js';
+import { pool } from '../db.js'
 
 /**
  * Récupère le stock disponible par produit (FEFO), en excluant les réservations actives.
@@ -26,29 +26,29 @@ export async function getAvailableStockByProduct() {
           AND l.expiry_date >= CURDATE()
           AND l.quantity > 0
         ORDER BY l.product_id, l.expiry_date ASC
-    `);
+    `)
 
-    const stockMap = new Map();
+    const stockMap = new Map()
 
     for (const row of rows) {
-        const pid = row.product_id;
+        const pid = row.product_id
         if (!stockMap.has(pid)) {
-            stockMap.set(pid, { available: 0, lots: [] });
+            stockMap.set(pid, { available: 0, lots: [] })
         }
-        const entry = stockMap.get(pid);
-        const qty = Number(row.available);
+        const entry = stockMap.get(pid)
+        const qty = Number(row.available)
         if (qty > 0) {
-            entry.available += qty;
+            entry.available += qty
             entry.lots.push({
                 lot_id: row.lot_id,
                 qty,
                 expiry_date: row.expiry_date,
                 days_until_expiry: Number(row.days_until_expiry)
-            });
+            })
         }
     }
 
-    return stockMap;
+    return stockMap
 }
 
 /**
@@ -59,27 +59,27 @@ export async function getAllRecipesWithItems() {
         SELECT r.id, r.name, r.base_portions, r.waste_rate
         FROM recipe r
         ORDER BY r.name
-    `);
+    `)
 
     const [items] = await pool.query(`
         SELECT ri.recipe_id, ri.product_id, ri.qty_per_portion, p.name AS product_name, p.unit
         FROM recipe_item ri
         JOIN product p ON p.id = ri.product_id
         ORDER BY ri.recipe_id, ri.id
-    `);
+    `)
 
     // Grouper les items par recette
-    const itemsByRecipe = new Map();
+    const itemsByRecipe = new Map()
     for (const it of items) {
         if (!itemsByRecipe.has(it.recipe_id)) {
-            itemsByRecipe.set(it.recipe_id, []);
+            itemsByRecipe.set(it.recipe_id, [])
         }
         itemsByRecipe.get(it.recipe_id).push({
             product_id: it.product_id,
             product_name: it.product_name,
             unit: it.unit,
             qty_per_portion: Number(it.qty_per_portion)
-        });
+        })
     }
 
     return recipes.map(r => ({
@@ -88,7 +88,7 @@ export async function getAllRecipesWithItems() {
         base_portions: r.base_portions,
         waste_rate: Number(r.waste_rate),
         items: itemsByRecipe.get(r.id) || []
-    }));
+    }))
 }
 
 /**
@@ -99,29 +99,29 @@ export async function getAllRecipesWithItems() {
  * @returns {Array} Liste de suggestions triées par score FEFO décroissant
  */
 export async function getSuggestions(portions = 10, limit = 10) {
-    const stockMap = await getAvailableStockByProduct();
-    const recipes = await getAllRecipesWithItems();
+    const stockMap = await getAvailableStockByProduct()
+    const recipes = await getAllRecipesWithItems()
 
-    const suggestions = [];
+    const suggestions = []
 
     for (const recipe of recipes) {
-        if (recipe.items.length === 0) continue;
+        if (recipe.items.length === 0) continue
 
-        const wasteFactor = 1 + recipe.waste_rate / 100;
-        let feasible = true;
-        let fefoScore = 0;
-        let totalIngredients = recipe.items.length;
-        let urgentIngredients = 0;
-        const missingIngredients = [];
-        const usedLots = [];
+        const wasteFactor = 1 + recipe.waste_rate / 100
+        let feasible = true
+        let fefoScore = 0
+        let totalIngredients = recipe.items.length
+        let urgentIngredients = 0
+        const missingIngredients = []
+        const usedLots = []
 
         for (const item of recipe.items) {
-            const needed = item.qty_per_portion * portions * wasteFactor;
-            const stock = stockMap.get(item.product_id);
+            const needed = item.qty_per_portion * portions * wasteFactor
+            const stock = stockMap.get(item.product_id)
 
             if (!stock || stock.available < needed) {
-                feasible = false;
-                const available = stock?.available || 0;
+                feasible = false
+                const available = stock?.available || 0
                 missingIngredients.push({
                     product_id: item.product_id,
                     product_name: item.product_name,
@@ -129,22 +129,22 @@ export async function getSuggestions(portions = 10, limit = 10) {
                     needed: Number(needed.toFixed(4)),
                     available: Number(available.toFixed(4)),
                     deficit: Number((needed - available).toFixed(4))
-                });
+                })
             } else {
                 // Calculer le score FEFO : on simule la consommation FEFO
-                let remaining = needed;
+                let remaining = needed
                 for (const lot of stock.lots) {
-                    if (remaining <= 0) break;
-                    const take = Math.min(remaining, lot.qty);
+                    if (remaining <= 0) break
+                    const take = Math.min(remaining, lot.qty)
                     if (take > 0) {
                         // Score basé sur l'urgence : plus le lot expire tôt, plus le score est élevé
                         // Formule : score += (quantité utilisée / quantité totale) * (1 / (jours + 1))
-                        const urgencyWeight = 1 / (lot.days_until_expiry + 1);
-                        fefoScore += (take / needed) * urgencyWeight * 100;
+                        const urgencyWeight = 1 / (lot.days_until_expiry + 1)
+                        fefoScore += (take / needed) * urgencyWeight * 100
 
                         // Compter les ingrédients urgents (≤ 7 jours)
                         if (lot.days_until_expiry <= 7) {
-                            urgentIngredients++;
+                            urgentIngredients++
                         }
 
                         usedLots.push({
@@ -154,16 +154,16 @@ export async function getSuggestions(portions = 10, limit = 10) {
                             qty_used: Number(take.toFixed(4)),
                             days_until_expiry: lot.days_until_expiry,
                             expiry_date: lot.expiry_date
-                        });
+                        })
 
-                        remaining -= take;
+                        remaining -= take
                     }
                 }
             }
         }
 
         // Normaliser le score FEFO par le nombre d'ingrédients
-        const normalizedScore = totalIngredients > 0 ? fefoScore / totalIngredients : 0;
+        const normalizedScore = totalIngredients > 0 ? fefoScore / totalIngredients : 0
 
         suggestions.push({
             recipe_id: recipe.id,
@@ -180,16 +180,16 @@ export async function getSuggestions(portions = 10, limit = 10) {
                     ? `${urgentIngredients} ingrédient(s) expire(nt) dans ≤7 jours`
                     : 'Stock suffisant'
                 : `Manque ${missingIngredients.length} ingrédient(s)`
-        });
+        })
     }
 
     // Trier : faisables d'abord, puis par score FEFO décroissant
     suggestions.sort((a, b) => {
-        if (a.feasible !== b.feasible) return b.feasible - a.feasible;
-        return b.fefo_score - a.fefo_score;
-    });
+        if (a.feasible !== b.feasible) return b.feasible - a.feasible
+        return b.fefo_score - a.fefo_score
+    })
 
-    return suggestions.slice(0, limit);
+    return suggestions.slice(0, limit)
 }
 
 /**
@@ -220,7 +220,7 @@ export async function getAtRiskProducts(daysThreshold = 7) {
           AND l.expiry_date >= CURDATE()
           AND DATEDIFF(l.expiry_date, CURDATE()) <= ?
         ORDER BY l.expiry_date ASC, p.name
-    `, [daysThreshold]);
+    `, [daysThreshold])
 
     return rows.map(r => ({
         product_id: r.id,
@@ -231,41 +231,41 @@ export async function getAtRiskProducts(daysThreshold = 7) {
         expiry_date: r.expiry_date,
         days_until_expiry: r.days_until_expiry,
         available: Number(r.available)
-    }));
+    }))
 }
 
 /**
  * Calcule le nombre maximum de portions réalisables pour une recette donnée.
  */
 export async function getMaxPortionsForRecipe(recipeId) {
-    const stockMap = await getAvailableStockByProduct();
-    const recipes = await getAllRecipesWithItems();
-    const recipe = recipes.find(r => r.id === recipeId);
+    const stockMap = await getAvailableStockByProduct()
+    const recipes = await getAllRecipesWithItems()
+    const recipe = recipes.find(r => r.id === recipeId)
 
     if (!recipe || recipe.items.length === 0) {
-        return { recipe_id: recipeId, max_portions: 0, limiting_ingredient: null };
+        return { recipe_id: recipeId, max_portions: 0, limiting_ingredient: null }
     }
 
-    const wasteFactor = 1 + recipe.waste_rate / 100;
-    let maxPortions = Infinity;
-    let limitingIngredient = null;
+    const wasteFactor = 1 + recipe.waste_rate / 100
+    let maxPortions = Infinity
+    let limitingIngredient = null
 
     for (const item of recipe.items) {
-        const stock = stockMap.get(item.product_id);
-        const available = stock?.available || 0;
-        const qtyPerPortion = item.qty_per_portion * wasteFactor;
+        const stock = stockMap.get(item.product_id)
+        const available = stock?.available || 0
+        const qtyPerPortion = item.qty_per_portion * wasteFactor
 
         if (qtyPerPortion > 0) {
-            const possiblePortions = Math.floor(available / qtyPerPortion);
+            const possiblePortions = Math.floor(available / qtyPerPortion)
             if (possiblePortions < maxPortions) {
-                maxPortions = possiblePortions;
+                maxPortions = possiblePortions
                 limitingIngredient = {
                     product_id: item.product_id,
                     product_name: item.product_name,
                     unit: item.unit,
                     available: Number(available.toFixed(4)),
                     qty_per_portion: Number(qtyPerPortion.toFixed(4))
-                };
+                }
             }
         }
     }
@@ -275,5 +275,5 @@ export async function getMaxPortionsForRecipe(recipeId) {
         recipe_name: recipe.name,
         max_portions: maxPortions === Infinity ? 0 : maxPortions,
         limiting_ingredient: limitingIngredient
-    };
+    }
 }

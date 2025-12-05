@@ -1,60 +1,60 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import Layout from '../components/Layout';
-import Modal from '../components/Modal';
-import ConfirmDialog from '../components/ConfirmDialog';
-import Pagination from '../components/Pagination';
-import api from '../api/axios';
-import useDebounce from '../hooks/useDebounce';
+import { useEffect, useMemo, useState } from 'react'
+import { useForm, useFieldArray } from 'react-hook-form'
+import Layout from '../components/Layout'
+import Modal from '../components/Modal'
+import ConfirmDialog from '../components/ConfirmDialog'
+import Pagination from '../components/Pagination'
+import api from '../api/axios'
+import useDebounce from '../hooks/useDebounce'
 
 export default function Recipes() {
-    const [rows, setRows] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [page, setPage] = useState(1);
-    const [pageSize] = useState(10);
-    const [total, setTotal] = useState(0);
-    const [q, setQ] = useState('');
-    const qDebounced = useDebounce(q, 300);
+    const [rows, setRows] = useState([])
+    const [products, setProducts] = useState([])
+    const [page, setPage] = useState(1)
+    const [pageSize] = useState(10)
+    const [total, setTotal] = useState(0)
+    const [q, setQ] = useState('')
+    const qDebounced = useDebounce(q, 300)
 
-    const [openForm, setOpenForm] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [openConfirm, setOpenConfirm] = useState(false);
-    const [toDelete, setToDelete] = useState(null);
+    const [openForm, setOpenForm] = useState(false)
+    const [editing, setEditing] = useState(null)
+    const [openConfirm, setOpenConfirm] = useState(false)
+    const [toDelete, setToDelete] = useState(null)
 
     const { register, handleSubmit, control, reset, getValues } = useForm({
         defaultValues: { name: '', base_portions: 10, waste_rate: 0, items: [] }
-    });
-    const { fields, append, remove, replace } = useFieldArray({ control, name: 'items' });
+    })
+    const { fields, append, remove, replace } = useFieldArray({ control, name: 'items' })
 
     async function load(p = page, qq = qDebounced) {
         const [prods, recs] = await Promise.all([
             api.get('/products', { params: { page: 1, pageSize: 1000 } }),
             api.get('/recipes', { params: { page: p, pageSize, q: qq } })
-        ]);
+        ])
         console.log(prods)
-        setProducts(prods.data.data || prods.data);
+        setProducts(prods.data.data || prods.data)
         setRows(recs.data.data)
         setTotal(recs.data.total)
         setPage(recs.data.page)
     }
-    // useEffect(() => { load(1, ''); }, []);
-    useEffect(() => { load(1, qDebounced); }, [qDebounced]);
+    // useEffect(() => { load(1, '') }, [])
+    useEffect(() => { load(1, qDebounced) }, [qDebounced])
 
     function openAdd() {
-        setEditing(null);
-        reset({ name: '', base_portions: 10, waste_rate: 0, items: [] });
-        setOpenForm(true);
+        setEditing(null)
+        reset({ name: '', base_portions: 10, waste_rate: 0, items: [] })
+        setOpenForm(true)
     }
     async function openEdit(row) {
-        setEditing(row);
-        const { data: items } = await api.get(`/recipes/${row.id}/items`);
+        setEditing(row)
+        const { data: items } = await api.get(`/recipes/${row.id}/items`)
         reset({
             name: row.name,
             base_portions: row.base_portions,
             waste_rate: row.waste_rate,
             items: items.map(it => ({ product_id: it.product_id, qty_per_portion: it.qty_per_portion }))
-        });
-        setOpenForm(true);
+        })
+        setOpenForm(true)
     }
     async function onSubmit(values) {
         const payload = {
@@ -62,27 +62,31 @@ export default function Recipes() {
             base_portions: Number(values.base_portions),
             waste_rate: Number(values.waste_rate),
             items: values.items.map(it => ({ product_id: Number(it.product_id), qty_per_portion: Number(it.qty_per_portion) }))
-        };
-        if (editing) await api.patch(`/recipes/${editing.id}`, payload);
-        else await api.post('/recipes', payload);
-        setOpenForm(false);
-        await load();
+        }
+        if (editing) await api.patch(`/recipes/${editing.id}`, payload)
+        else await api.post('/recipes', payload)
+        setOpenForm(false)
+        await load()
     }
 
-    function askDelete(row) { setToDelete(row); setOpenConfirm(true); }
+    function askDelete(row) {
+        setToDelete(row)
+        setOpenConfirm(true)
+    }
     async function doDelete() {
         try {
-            await api.delete(`/recipes/${toDelete.id}`);
-            setOpenConfirm(false); setToDelete(null);
-            const newPage = (rows.length === 1 && page > 1) ? page - 1 : page;
-            await load(newPage, qDebounced);
-        } catch (e) { 
-            // alert(e?.response?.data?.error || 'Cannot delete'); 
+            await api.delete(`/recipes/${toDelete.id}`)
+            setOpenConfirm(false)
+            setToDelete(null)
+            const newPage = (rows.length === 1 && page > 1) ? page - 1 : page
+            await load(newPage, qDebounced)
+        } catch (e) {
+            // alert(e?.response?.data?.error || 'Cannot delete') 
             // console.log(e)
         }
     }
 
-    const productOptions = useMemo(() => products.map(p => ({ value: p.id, label: `${p.name} (${p.unit})` })), [products]);
+    const productOptions = useMemo(() => products.map(p => ({ value: p.id, label: `${p.name} (${p.unit})` })), [products])
 
     return (
         <Layout>
@@ -199,9 +203,12 @@ export default function Recipes() {
                 open={openConfirm}
                 title="Delete recipe"
                 message={`Delete "${toDelete?.name}" ?`}
-                onCancel={() => { setOpenConfirm(false); setToDelete(null); }}
+                onCancel={() => {
+                    setOpenConfirm(false)
+                    setToDelete(null)
+                }}
                 onConfirm={doDelete}
             />
         </Layout>
-    );
+    )
 }

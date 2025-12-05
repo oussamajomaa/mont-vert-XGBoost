@@ -12,7 +12,7 @@ export default function Register() {
             await registerUser(values)
             // alert('User created')
             reset({ name: '', email: '', password: '', role: 'KITCHEN' })
-            toast.success('User created');
+            toast.success('User created')
         } catch (e) {
             // alert('Failed to create user (email may exist).')
             // console.log(e)
