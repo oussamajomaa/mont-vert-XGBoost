@@ -379,7 +379,87 @@ export default function Dashboard() {
 				</div>
 			</div>
 
-			{/* Réappro + Impact FEFO */}
+			
+
+			{/* Impact FEFO + Lots proches DLC */}
+			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+				{/* Impact FEFO */}
+				<div className=" from-green-50 to-blue-50 rounded-lg p-6 border border-green-200">
+					<div className="flex items-start gap-4">
+						<span className="text-4xl">🌱</span>
+						<div className="flex-1">
+							<h3 className="font-semibold text-lg text-green-800 mb-3">
+								Impact du système FEFO
+							</h3>
+							<div className="grid grid-cols-3 gap-4 text-sm">
+								<div>
+									<div className="text-green-600 font-semibold text-xl">
+										{savings.plans_executed}
+									</div>
+									<div className="text-slate-600">Plans exécutés</div>
+								</div>
+								<div>
+									<div className="text-green-600 font-semibold text-xl">
+										{savings.qty_consumed_fefo?.toFixed(1) || 0} kg
+									</div>
+									<div className="text-slate-600">Consommés en FEFO</div>
+								</div>
+								<div>
+									<div className="text-green-600 font-semibold text-xl">
+										~{euro(savings.estimated_savings_eur)}
+									</div>
+									<div className="text-slate-600">Économies estimées</div>
+								</div>
+							</div>
+							<p className="text-xs text-slate-500 mt-3">
+								Estimation basée sur 15% de pertes évitées grâce au système FEFO
+							</p>
+						</div>
+					</div>
+				</div>
+
+
+				{/* Lots proches de DLC */}
+				<div className="bg-white rounded shadow p-4">
+					<div className="font-semibold mb-2">Lots proches de DLC</div>
+					<table className="min-w-full text-sm">
+						<thead className="bg-slate-100">
+							<tr>
+								<th className="text-left px-3 py-2">Produit</th>
+								<th className="text-left px-3 py-2">Lot</th>
+								<th className="text-left px-3 py-2">DLC</th>
+								<th className="text-right px-3 py-2">Qté</th>
+							</tr>
+						</thead>
+						<tbody>
+							{expiringLots && expiringLots.length > 0 ? (
+								expiringLots.map((l) => (
+									<tr key={l.id} className="border-t">
+										<td className="px-3 py-2">
+											{l.product_name}{' '}
+											<span className="text-slate-400 text-xs">({l.unit})</span>
+										</td>
+										<td className="px-3 py-2">{l.batch_number}</td>
+										<td className="px-3 py-2">
+											{String(l.expiry_date).slice(0, 10)}
+										</td>
+										<td className="px-3 py-2 text-right">
+											{Number(l.quantity).toFixed(3)}
+										</td>
+									</tr>
+								))
+							) : (
+								<tr>
+									<td className="px-3 py-4 text-slate-500" colSpan={4}>
+										Aucun lot proche de la DLC dans les 7–21 prochains jours.
+									</td>
+								</tr>
+							)}
+						</tbody>
+					</table>
+				</div>
+			</div>
+			{/* Réappro + Pertes */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 				<div className="bg-white rounded shadow p-4">
 					<div className="font-semibold mb-2">Produits à réapprovisionner</div>
@@ -422,45 +502,6 @@ export default function Dashboard() {
 						</tbody>
 					</table>
 				</div>
-
-				{/* Impact FEFO */}
-				<div className=" from-green-50 to-blue-50 rounded-lg p-6 border border-green-200">
-					<div className="flex items-start gap-4">
-						<span className="text-4xl">🌱</span>
-						<div className="flex-1">
-							<h3 className="font-semibold text-lg text-green-800 mb-3">
-								Impact du système FEFO
-							</h3>
-							<div className="grid grid-cols-3 gap-4 text-sm">
-								<div>
-									<div className="text-green-600 font-semibold text-xl">
-										{savings.plans_executed}
-									</div>
-									<div className="text-slate-600">Plans exécutés</div>
-								</div>
-								<div>
-									<div className="text-green-600 font-semibold text-xl">
-										{savings.qty_consumed_fefo?.toFixed(1) || 0} kg
-									</div>
-									<div className="text-slate-600">Consommés en FEFO</div>
-								</div>
-								<div>
-									<div className="text-green-600 font-semibold text-xl">
-										~{euro(savings.estimated_savings_eur)}
-									</div>
-									<div className="text-slate-600">Économies estimées</div>
-								</div>
-							</div>
-							<p className="text-xs text-slate-500 mt-3">
-								Estimation basée sur 15% de pertes évitées grâce au système FEFO
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			{/* Pertes + Lots proches DLC */}
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 				<div className="bg-white rounded shadow p-4">
 					<div className="font-semibold mb-2">Pertes (30j)</div>
 					<table className="min-w-full text-sm">
@@ -506,45 +547,6 @@ export default function Dashboard() {
 					</table>
 				</div>
 
-				{/* Lots proches de DLC */}
-				<div className="bg-white rounded shadow p-4">
-					<div className="font-semibold mb-2">Lots proches de DLC</div>
-					<table className="min-w-full text-sm">
-						<thead className="bg-slate-100">
-							<tr>
-								<th className="text-left px-3 py-2">Produit</th>
-								<th className="text-left px-3 py-2">Lot</th>
-								<th className="text-left px-3 py-2">DLC</th>
-								<th className="text-right px-3 py-2">Qté</th>
-							</tr>
-						</thead>
-						<tbody>
-							{expiringLots && expiringLots.length > 0 ? (
-								expiringLots.map((l) => (
-									<tr key={l.id} className="border-t">
-										<td className="px-3 py-2">
-											{l.product_name}{' '}
-											<span className="text-slate-400 text-xs">({l.unit})</span>
-										</td>
-										<td className="px-3 py-2">{l.batch_number}</td>
-										<td className="px-3 py-2">
-											{String(l.expiry_date).slice(0, 10)}
-										</td>
-										<td className="px-3 py-2 text-right">
-											{Number(l.quantity).toFixed(3)}
-										</td>
-									</tr>
-								))
-							) : (
-								<tr>
-									<td className="px-3 py-4 text-slate-500" colSpan={4}>
-										Aucun lot proche de la DLC dans les 7–21 prochains jours.
-									</td>
-								</tr>
-							)}
-						</tbody>
-					</table>
-				</div>
 			</div>
 		</Layout>
 	)
