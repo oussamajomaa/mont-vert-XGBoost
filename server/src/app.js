@@ -12,6 +12,7 @@ import userRoutes from './routes/user.routes.js'
 import aiRoutes from './routes/ai.routes.js'
 import alertRoutes from './routes/alert.routes.js'
 import mlRoutes from './routes/ml.routes.js'
+import maintenanceRoutes from './routes/maintenance.routes.js'
 import { startAlertScheduler } from './cron/scheduler.js'
 import cookieParser from 'cookie-parser'
 
@@ -33,6 +34,7 @@ app.use('/users', userRoutes)
 app.use('/ai', aiRoutes)
 app.use('/alerts', alertRoutes)
 app.use('/ml', mlRoutes)
+app.use('/maintenance', maintenanceRoutes)
 
 app.use((err, _req, res, _next) => {
     console.error(err)

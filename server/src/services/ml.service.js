@@ -79,31 +79,114 @@ export async function exportTrainingData() {
     console.log(`    ${ingredientsByRecipe.size} recettes avec ingrédients`)
 
     // Récupérer le stock actuel
-    const [stockRows] = await pool.query(`
-        SELECT 
-            p.id as product_id,
-            COALESCE(SUM(l.quantity), 0) as available_qty,
-            MIN(DATEDIFF(l.expiry_date, CURDATE())) as days_to_expiry
-        FROM product p
-        LEFT JOIN lot l ON l.product_id = p.id 
-            AND l.archived = FALSE 
-            AND l.expiry_date >= CURDATE()
-        GROUP BY p.id
-    `)
+    // const [stockRows] = await pool.query(`
+    //     SELECT 
+    //         p.id as product_id,
+    //         COALESCE(SUM(l.quantity), 0) as available_qty,
+    //         MIN(DATEDIFF(l.expiry_date, CURDATE())) as days_to_expiry
+    //     FROM product p
+    //     LEFT JOIN lot l ON l.product_id = p.id 
+    //         AND l.archived = FALSE 
+    //         AND l.expiry_date >= CURDATE()
+    //     GROUP BY p.id
+    // `)
 
-    const stockMap = new Map()
-    for (const s of stockRows) {
-        stockMap.set(s.product_id, {
-            available_qty: Number(s.available_qty) || 0,
-            days_to_expiry: s.days_to_expiry !== null ? Number(s.days_to_expiry) : 999
-        })
+    // const stockMap = new Map()
+    // for (const s of stockRows) {
+    //     stockMap.set(s.product_id, {
+    //         available_qty: Number(s.available_qty) || 0,
+    //         days_to_expiry: s.days_to_expiry !== null ? Number(s.days_to_expiry) : 999
+    //     })
+    // }
+
+    // console.log(`    ${stockRows.length} produits en stock`)
+
+    // ************************************
+    // 1) Toutes les dates à couvrir (une date référence par exemple)
+    const distinctDates = Array.from(
+        new Set(
+            items.map((item) => {
+                const dateRef = item.execution_date || item.period_start;
+                // item.execution_date est déjà un Date en JS grâce au driver MySQL
+                return dateRef.toISOString().split('T')[0];
+            })
+        )
+    );
+
+    // 2) Charger tous les snapshots correspondants
+    let snapshotMapByDate = new Map();
+
+    if (distinctDates.length) {
+        const [snapRows] = await pool.query(
+            `
+      SELECT snapshot_date, product_id, available_qty, days_to_expiry
+      FROM stock_snapshot
+      WHERE snapshot_date IN (?)
+      `,
+            [distinctDates]
+        );
+
+        snapshotMapByDate = new Map();
+        for (const row of snapRows) {
+            const dateKey = row.snapshot_date.toISOString
+                ? row.snapshot_date.toISOString().slice(0, 10)
+                : String(row.snapshot_date);
+            if (!snapshotMapByDate.has(dateKey)) {
+                snapshotMapByDate.set(dateKey, new Map());
+            }
+            snapshotMapByDate
+                .get(dateKey)
+                .set(row.product_id, {
+                    available_qty: Number(row.available_qty) || 0,
+                    days_to_expiry:
+                        row.days_to_expiry !== null ? Number(row.days_to_expiry) : 999,
+                });
+        }
     }
 
-    console.log(`    ${stockRows.length} produits en stock`)
+    // 3) Fallback : stock actuel si pas de snapshot pour une date donnée
+    const [currentStockRows] = await pool.query(`
+    SELECT 
+      p.id as product_id,
+      COALESCE(SUM(l.quantity), 0) as available_qty,
+      IFNULL(MIN(DATEDIFF(l.expiry_date, CURDATE())), 999) as days_to_expiry
+    FROM product p
+    LEFT JOIN lot l ON l.product_id = p.id 
+        AND l.archived = FALSE 
+        AND l.expiry_date >= CURDATE()
+    GROUP BY p.id
+  `);
+
+    const fallbackStockMap = new Map();
+    for (const s of currentStockRows) {
+        fallbackStockMap.set(s.product_id, {
+            available_qty: Number(s.available_qty) || 0,
+            days_to_expiry:
+                s.days_to_expiry !== null ? Number(s.days_to_expiry) : 999,
+        });
+    }
+
+    // ************************************
 
     // Assemblage du dataset
+    // const dataset = items.map(item => {
+    //     const dateRef = item.execution_date || item.period_start
+
+    //     let lastRecipes = [0, 0]
+    //     if (item.last_recipe_ids_str) {
+    //         const parts = item.last_recipe_ids_str.split(',').map(Number)
+    //         if (parts.length >= 1) lastRecipes[0] = parts[0] || 0
+    //         if (parts.length >= 2) lastRecipes[1] = parts[1] || 0
+    //     }
+
+    //     const ingredients = ingredientsByRecipe.get(item.recipe_id) || []
+    //     const stockFeatures = calculateRecipeStockFeatures(ingredients, stockMap, item.planned_portions)
+
+    // ********************************************************
+
     const dataset = items.map(item => {
-        const dateRef = item.execution_date || item.period_start
+        const dateRef = item.execution_date || item.period_start;
+        const dateKey = dateRef.toISOString().split('T')[0];
 
         let lastRecipes = [0, 0]
         if (item.last_recipe_ids_str) {
@@ -112,8 +195,19 @@ export async function exportTrainingData() {
             if (parts.length >= 2) lastRecipes[1] = parts[1] || 0
         }
 
-        const ingredients = ingredientsByRecipe.get(item.recipe_id) || []
-        const stockFeatures = calculateRecipeStockFeatures(ingredients, stockMap, item.planned_portions)
+        const ingredients = ingredientsByRecipe.get(item.recipe_id) || [];
+
+        // Choisir le bon stockMap pour cette date
+        const stockMapForDate =
+            snapshotMapByDate.get(dateKey) || fallbackStockMap;
+
+        const stockFeatures = calculateRecipeStockFeatures(
+            ingredients,
+            stockMapForDate,
+            item.planned_portions
+        );
+
+        // ********************************************************
 
         return {
             date: dateRef.toISOString().split('T')[0],
@@ -351,6 +445,24 @@ export async function predict({ date, planned_portions, num_predictions = 5 }) {
 
             // Limiter au nombre demandé
             result.predictions = result.predictions.slice(0, num_predictions)
+
+            const ctxDate = date; // param de predict()
+            const nowPortions = planned_portions;
+            
+            // *******************************************************************
+            await Promise.all(
+                result.predictions.map((p, idx) =>
+                    pool.query(
+                        `
+                        INSERT INTO ml_prediction_log
+                            (context_date, planned_portions, recipe_id, rank_in_list, chosen)
+                        VALUES (?,?,?,?,0)
+                        `,
+                        [ctxDate, nowPortions, p.recipe_id, idx + 1]
+                    )
+                )
+            );
+            // *******************************************************************
 
             // RÉGÉNÉRER les reasons et confidence avec les VRAIES features
             result.predictions = result.predictions.map(pred => ({

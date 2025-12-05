@@ -923,6 +923,3 @@ Voir la section [Routes API](#routes-api) pour la liste complète.
 - **Repository** : https://github.com/oussamajomaa/mont-vert
 - **Issues** : Ouvrir une issue sur GitHub
 
----
-
-*Documentation générée le 26/11/2025 - Mont-Vert v15*
