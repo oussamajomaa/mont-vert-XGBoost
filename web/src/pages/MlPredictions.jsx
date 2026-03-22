@@ -82,7 +82,7 @@ export default function MlPredictions() {
             setLoading(false)
         }
     }
-
+console.log(predictions)
     const getConfidenceColor = (confidence) => {
         switch (confidence) {
             case 'high': return 'bg-green-100 text-green-800 border-green-300'
@@ -320,6 +320,7 @@ export default function MlPredictions() {
                         <h2 className="text-lg font-semibold">🎯 Recettes recommandées par l'IA</h2>
 
                         {predictions.map((pred, idx) => (
+                            
                             <div
                                 key={pred.recipe_id}
                                 className={`bg-white rounded-lg border-2 p-6 ${idx === 0 ? 'border-green-400 shadow-lg' : 'border-gray-200'}`}

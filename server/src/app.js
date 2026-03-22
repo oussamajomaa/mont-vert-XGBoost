@@ -1,3 +1,6 @@
+import dotenv from 'dotenv' 
+dotenv.config()
+
 import express from 'express'
 import cors from 'cors'
 import authRoutes from './auth/auth.routes.js'
@@ -19,7 +22,12 @@ import cookieParser from 'cookie-parser'
 
 const app = express()
 app.use(cookieParser())
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }))
+if (process.env.NODE_ENV !== "production") {
+  app.use(cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    credentials: true,
+  }));
+}
 app.use(express.json())
 
 app.use('/auth', authRoutes)
@@ -42,14 +50,27 @@ app.use((err, _req, res, _next) => {
 })
 
 // export default app
-const port = process.env.PORT || 4000
-app.listen(port, () => {
+// const port = process.env.PORT || 4000
+// app.listen(port, () => {
+//     console.log(`API running on :${port}`)
+
+//     // Démarrer le scheduler d'alertes si activé
+//     if (process.env.ENABLE_ALERT_SCHEDULER !== 'false') {
+//         // Par défaut: tous les jours à 7h00
+//         const cronExpression = process.env.ALERT_CRON || '0 7 * * *'
+//         startAlertScheduler(cronExpression)
+//     }
+// })
+if (process.env.NODE_ENV !== 'test') {
+  const port = process.env.PORT || 4000
+  app.listen(port, () => {
     console.log(`API running on :${port}`)
 
-    // Démarrer le scheduler d'alertes si activé
     if (process.env.ENABLE_ALERT_SCHEDULER !== 'false') {
-        // Par défaut: tous les jours à 7h00
-        const cronExpression = process.env.ALERT_CRON || '0 7 * * *'
-        startAlertScheduler(cronExpression)
+      const cronExpression = process.env.ALERT_CRON || '0 7 * * *'
+      startAlertScheduler(cronExpression)
     }
-})
+  })
+}
+
+export default app

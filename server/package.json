@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon src/app.js",
-    "start": "node src/app.js"
+    "start": "node src/app.js",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -23,5 +24,9 @@
     "nodemailer": "^7.0.11",
     "pdfkit": "^0.17.2",
     "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4",
+    "supertest": "^7.1.1"
   }
 }

@@ -7,7 +7,7 @@
 
 import { pool } from '../db.js'
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001'
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EXPORT DES DONNÉES D'ENTRAÎNEMENT
@@ -78,28 +78,7 @@ export async function exportTrainingData() {
 
     console.log(`    ${ingredientsByRecipe.size} recettes avec ingrédients`)
 
-    // Récupérer le stock actuel
-    // const [stockRows] = await pool.query(`
-    //     SELECT 
-    //         p.id as product_id,
-    //         COALESCE(SUM(l.quantity), 0) as available_qty,
-    //         MIN(DATEDIFF(l.expiry_date, CURDATE())) as days_to_expiry
-    //     FROM product p
-    //     LEFT JOIN lot l ON l.product_id = p.id 
-    //         AND l.archived = FALSE 
-    //         AND l.expiry_date >= CURDATE()
-    //     GROUP BY p.id
-    // `)
-
-    // const stockMap = new Map()
-    // for (const s of stockRows) {
-    //     stockMap.set(s.product_id, {
-    //         available_qty: Number(s.available_qty) || 0,
-    //         days_to_expiry: s.days_to_expiry !== null ? Number(s.days_to_expiry) : 999
-    //     })
-    // }
-
-    // console.log(`    ${stockRows.length} produits en stock`)
+    
 
     // ************************************
     // 1) Toutes les dates à couvrir (une date référence par exemple)
@@ -169,20 +148,7 @@ export async function exportTrainingData() {
     // ************************************
 
     // Assemblage du dataset
-    // const dataset = items.map(item => {
-    //     const dateRef = item.execution_date || item.period_start
 
-    //     let lastRecipes = [0, 0]
-    //     if (item.last_recipe_ids_str) {
-    //         const parts = item.last_recipe_ids_str.split(',').map(Number)
-    //         if (parts.length >= 1) lastRecipes[0] = parts[0] || 0
-    //         if (parts.length >= 2) lastRecipes[1] = parts[1] || 0
-    //     }
-
-    //     const ingredients = ingredientsByRecipe.get(item.recipe_id) || []
-    //     const stockFeatures = calculateRecipeStockFeatures(ingredients, stockMap, item.planned_portions)
-
-    // ********************************************************
 
     const dataset = items.map(item => {
         const dateRef = item.execution_date || item.period_start;
