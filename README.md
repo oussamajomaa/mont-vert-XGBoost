@@ -711,7 +711,7 @@ Combine toutes les métriques en une seule vue :
 ### 1. Cloner le repository
 
 ```bash
-git clone https://github.com/oussamajomaa/mont-vert.git
+git clone https://github.com/oussamajomaa/mont-vert-XGBoost.git
 cd mont-vert
 ```
 
@@ -920,6 +920,6 @@ Voir la section [Routes API](#routes-api) pour la liste complète.
 
 ## Support
 
-- **Repository** : https://github.com/oussamajomaa/mont-vert
+- **Repository** : https://github.com/oussamajomaa/mont-vert-XGBoost.git
 - **Issues** : Ouvrir une issue sur GitHub
 
